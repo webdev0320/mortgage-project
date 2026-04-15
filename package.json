@@ -1,0 +1,16 @@
+{
+  "name": "idp-workbench-root",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mortgage IDP Workbench — Monorepo root",
+  "scripts": {
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:engine": "cd engine && uvicorn main:app --reload --port 8000",
+    "start:infra": "docker-compose up -d",
+    "stop:infra": "docker-compose down",
+    "db:migrate": "cd backend && npx prisma migrate dev",
+    "db:generate": "cd backend && npx prisma generate",
+    "db:studio": "cd backend && npx prisma studio"
+  }
+}

@@ -1,0 +1,6 @@
+node_modules/
+storage/
+.env
+*.mp4
+demo-recording.mp4
+record_demo.cjs
