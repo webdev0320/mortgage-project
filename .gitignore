@@ -4,3 +4,4 @@ storage/
 *.mp4
 demo-recording.mp4
 record_demo.cjs
+engine/.venv/
