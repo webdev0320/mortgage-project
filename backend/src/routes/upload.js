@@ -6,6 +6,7 @@ const axios = require('axios');
 const { v4: uuidv4 } = require('uuid');
 const { prisma } = require('../lib/prisma');
 const { logger } = require('../utils/logger');
+const { encryptFile } = require('../utils/crypto');
 
 const router = express.Router();
 
@@ -37,9 +38,13 @@ router.post('/', upload.single('file'), async (req, res) => {
   logger.info(`Saving blob locally: ${filePath}`);
 
   try {
-    // 1. Save the PDF to local storage
-    await fs.writeFile(filePath, req.file.buffer);
-    logger.info(`Blob stored at ${filePath}`);
+    // 1. Save and Encrypt the PDF to local storage
+    const tempPath = `${filePath}.tmp`;
+    await fs.writeFile(tempPath, req.file.buffer);
+    await encryptFile(tempPath, filePath);
+    await fs.unlink(tempPath); // Delete unencrypted temp file
+    
+    logger.info(`Blob encrypted and stored at ${filePath}`);
 
     // 2. Create Blob record in Postgres
     const blob = await prisma.blob.create({

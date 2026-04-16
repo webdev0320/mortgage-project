@@ -1,0 +1,11 @@
+paddlepaddle
+paddleocr
+pymupdf
+numpy
+pillow
+rapidfuzz
+fastapi
+uvicorn
+pydantic
+requests
+python-dotenv

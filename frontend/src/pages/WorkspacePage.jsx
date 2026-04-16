@@ -4,7 +4,8 @@ import useWorkspaceStore from '../store/workspaceStore'
 import ThumbnailSidebar from '../components/ThumbnailSidebar'
 import MainCanvas from '../components/MainCanvas'
 import PropertiesPanel from '../components/PropertiesPanel'
-import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react'
+import axios from 'axios'
+import { ArrowLeft, Loader2, AlertCircle, Scissors, FileUp, CheckCircle } from 'lucide-react'
 
 export default function WorkspacePage() {
   const { blobId } = useParams()
@@ -46,7 +47,33 @@ export default function WorkspacePage() {
         <div className="h-4 w-px bg-white/10" />
         <span className="text-sm font-medium text-white truncate">{blob?.filename}</span>
         <span className="text-xs text-slate-500">{blob?.pageCount} pages</span>
-        <div className="ml-auto flex items-center gap-2">
+        <div className="ml-auto flex items-center gap-4">
+          <button 
+            onClick={() => navigate(`/workspace/${blobId}/split`)}
+            className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-white text-xs font-bold rounded-lg border border-white/10 transition-all active:scale-95"
+          >
+            <Scissors className="w-3.5 h-3.5 text-indigo-400" />
+            Manage Flow
+          </button>
+          
+          <button 
+            id="export-pdf-btn"
+            onClick={async () => {
+              try {
+                const { data } = await axios.post(`/api/export/${blobId}`)
+                if (data.success) {
+                   alert(`Success! Generated ${data.files.length} documents:\n${data.files.join('\n')}\n\nFiles saved in storage/final folder.`)
+                }
+              } catch (e) {
+                alert('Export failed. Check engine logs.')
+              }
+            }}
+            className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-emerald-600/20 transition-all active:scale-95"
+          >
+            <FileUp className="w-3.5 h-3.5" />
+            Export Final
+          </button>
+
           <StatusBadge status={blob?.status} />
         </div>
       </header>

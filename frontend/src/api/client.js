@@ -13,6 +13,7 @@ export const uploadBlob = (file, onProgress) => {
 
 export const fetchBlobs = () => api.get('/blobs')
 export const fetchBlob = (id) => api.get(`/blobs/${id}`)
+export const deleteBlob = (id) => api.delete(`/blobs/${id}`)
 export const updatePage = (id, data) => api.patch(`/pages/${id}`, data)
 export const splitDocument = (payload) => api.post('/documents/split', payload)
 export const mergeDocuments = (payload) => api.post('/documents/merge', payload)

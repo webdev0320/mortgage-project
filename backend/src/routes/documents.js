@@ -30,7 +30,7 @@ router.post('/split', async (req, res) => {
         blobId,
         documentId: doc.id,
         action: 'SPLIT',
-        payload: { pageIds, documentType },
+        payload: JSON.stringify({ pageIds, documentType }),
       },
     });
 
@@ -74,7 +74,7 @@ router.post('/merge', async (req, res) => {
         blobId,
         documentId: targetDocumentId,
         action: 'MERGE',
-        payload: { sourceDocumentId, targetDocumentId },
+        payload: JSON.stringify({ sourceDocumentId, targetDocumentId }),
       },
     });
   });
@@ -98,14 +98,31 @@ router.patch('/:id/verify', async (req, res) => {
         ...(documentType && { documentType }),
         ...(name && { name }),
       },
+      include: { pages: { include: { page: true } } }
     });
+
+    // Recording corrections for the feedback loop
+    if (documentType) {
+      for (const dp of updated.pages) {
+        if (dp.page.aiLabel !== documentType) {
+          await tx.classificationCorrection.create({
+            data: {
+              blobId: updated.blobId,
+              originalAiLabel: dp.page.aiLabel || 'UNKNOWN',
+              finalHumanLabel: documentType,
+              pageThumbnailPath: dp.page.s3Path
+            }
+          });
+        }
+      }
+    }
 
     await tx.auditLog.create({
       data: {
         blobId: blobId || updated.blobId,
         documentId: updated.id,
         action: 'VERIFY',
-        payload: { documentType, name },
+        payload: JSON.stringify({ documentType, name }),
       },
     });
 
@@ -132,7 +149,7 @@ router.patch('/:id/rename', async (req, res) => {
         blobId: blobId || updated.blobId,
         documentId: updated.id,
         action: 'RENAME',
-        payload: { name, documentType },
+        payload: JSON.stringify({ name, documentType }),
       },
     });
 

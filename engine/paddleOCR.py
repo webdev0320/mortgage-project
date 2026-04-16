@@ -16,10 +16,9 @@ DOCUMENT_TYPES = {
 }
 
 ocr = PaddleOCR(
-    use_angle_cls=True,
+    use_textline_orientation=True,
     lang='en',
-    use_gpu=False,
-    show_log=False
+    device='cpu',
 )
 
 def classify_page(text_blocks):

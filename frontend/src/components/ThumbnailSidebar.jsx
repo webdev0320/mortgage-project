@@ -1,5 +1,4 @@
 import { useRef, useEffect } from 'react'
-import { FixedSizeList as List } from 'react-window'
 import {
   DndContext, closestCenter, KeyboardSensor,
   PointerSensor, useSensor, useSensors,
@@ -27,26 +26,19 @@ export default function ThumbnailSidebar() {
 
   const handleDragEnd = (event) => {
     const { active, over } = event
-    if (active.id !== over.id) reorderPages(active.id, over.id)
+    if (active && over && active.id !== over.id) reorderPages(active.id, over.id)
   }
 
   // Keyboard Hotkeys
   useEffect(() => {
     const handleKeyDown = (e) => {
       const key = e.key.toLowerCase()
-      if (key === 's') { /* Handle split if needed */ }
-      if (key === 'v') { /* Verify */ }
       if (key === 'arrowdown') selectNext?.()
       if (key === 'arrowup') selectPrev?.()
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [selectNext, selectPrev])
-
-  const Row = ({ index, style }) => {
-    const page = pages[index]
-    return <SortableItem key={page.id} page={page} index={index} style={style} />
-  }
 
   return (
     <div className="flex flex-col h-full bg-[#0d0f14] border-r border-white/5 shadow-2xl">
@@ -57,25 +49,25 @@ export default function ThumbnailSidebar() {
         {selectedPageIds.length > 1 && (
           <button
             onClick={staplePages}
-            className="flex items-center gap-1.5 px-2 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-lg shadow-lg hover:bg-indigo-500 active:scale-95 transition-all animate-in fade-in slide-in-from-top-2"
+            className="flex items-center gap-1.5 px-2 py-1 bg-indigo-600 text-white text-[10px] font-bold rounded-lg shadow-lg hover:bg-indigo-500 transition-all animate-in fade-in slide-in-from-top-2"
           >
             <GripVertical className="w-3 h-3" /> Staple ({selectedPageIds.length})
           </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 overflow-y-auto scrollbar-hide px-2 pt-4">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={pages.map(p => p.id)} strategy={verticalListSortingStrategy}>
-            <List
-              height={700}
-              itemCount={pages.length}
-              itemSize={180}
-              width="100%"
-              className="scrollbar-hide"
-            >
-              {Row}
-            </List>
+             <div className="space-y-4">
+               {pages.map((page, index) => (
+                 <SortableItem 
+                   key={page.id} 
+                   page={page} 
+                   index={index} 
+                 />
+               ))}
+             </div>
           </SortableContext>
         </DndContext>
       </div>
@@ -88,7 +80,7 @@ export default function ThumbnailSidebar() {
   )
 }
 
-function SortableItem({ page, index, style }) {
+function SortableItem({ page, index }) {
   const {
     pages, selectedPageIds, selectPage, splitAfterPage
   } = useWorkspaceStore()
@@ -98,7 +90,6 @@ function SortableItem({ page, index, style }) {
   } = useSortable({ id: page.id })
 
   const itemStyle = {
-    ...style,
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 50 : 1,
@@ -108,7 +99,7 @@ function SortableItem({ page, index, style }) {
 
   const isSelected = selectedPageIds.includes(page.id)
   const isLast = index === pages.length - 1
-  const lowConfidence = (page.confidenceScore ?? 0) < 0.8
+  const lowConfidence = (page.confidenceScore ?? 0) < 0.85
 
   return (
     <div ref={setNodeRef} style={itemStyle} className="flex flex-col gap-1">
@@ -168,16 +159,16 @@ function SortableItem({ page, index, style }) {
         <button
           onClick={(e) => { e.stopPropagation(); splitAfterPage(page.id) }}
           className="
-            group/split relative h-6 w-full flex items-center justify-center
-            hover:bg-indigo-500/5 rounded-md transition-all
+            relative h-6 w-full flex items-center justify-center
+            hover:bg-indigo-500/10 rounded-md transition-all
           "
         >
-          <div className="absolute inset-x-4 h-px bg-white/5 group-hover/split:bg-indigo-500/30" />
+          <div className="absolute inset-x-2 h-px bg-white/10 group-hover:bg-indigo-500/50" />
           <div className="
-            z-10 opacity-0 group-hover/split:opacity-100 transition-all scale-75 group-hover/split:scale-110
-            bg-indigo-600 text-white p-1 rounded-full shadow-lg border border-white/10
+            z-10 scale-90 hover:scale-110 transition-all
+            bg-indigo-600/80 text-white p-1 rounded-full shadow-lg border border-white/10
           ">
-            <Scissors className="w-3 h-3" />
+            <Scissors className="w-3.5 h-3.5" />
           </div>
         </button>
       )}

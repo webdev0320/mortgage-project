@@ -31,6 +31,8 @@ model Page {
   confidenceScore Float?
   isFlagged       Boolean        @default(false)
   rotation        Int            @default(0)
+  anomalyFlags    String?        // JSON string of quality issues (skew, blur, etc)
+  extractedData   String?        // JSON string of KVP (Box1, EIN, etc)
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   documentPages   DocumentPage[]
@@ -38,6 +40,17 @@ model Page {
 
   @@unique([blobId, pageIndex])
   @@map("pages")
+}
+
+model ClassificationCorrection {
+  id               String   @id @default(cuid())
+  blobId           String
+  originalAiLabel  String
+  finalHumanLabel  String
+  pageThumbnailPath String
+  createdAt        DateTime @default(now())
+
+  @@map("classification_corrections")
 }
 
 model Document {

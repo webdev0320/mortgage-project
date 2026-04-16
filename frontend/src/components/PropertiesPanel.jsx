@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { fetchConfiguredDocTypes } from '../api/client'
 import useWorkspaceStore from '../store/workspaceStore'
 import { CheckCircle2, ChevronDown, FileText, Layers, Merge, AlertTriangle } from 'lucide-react'
 
@@ -22,6 +23,11 @@ export default function PropertiesPanel() {
   const [mergeTarget, setMergeTarget] = useState('')
   const [busy, setBusy] = useState(false)
   const [toast, setToast] = useState(null)
+  const [availableTypes, setAvailableTypes] = useState([])
+
+  useEffect(() => {
+    fetchConfiguredDocTypes().then(({ data }) => setAvailableTypes(data.data))
+  }, [])
 
   useEffect(() => {
     if (doc) { setDocType(doc.documentType || ''); setDocName(doc.name || '') }
@@ -73,12 +79,26 @@ export default function PropertiesPanel() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-6">
+        
+        {/* ── LOW CONFIDENCE BANNER ── */}
+        {page && (page.confidenceScore < 0.85 || (page.anomalyFlags && JSON.parse(page.anomalyFlags).length > 0)) && (
+          <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-start gap-3 animate-pulse">
+            <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
+            <div>
+              <p className="text-[10px] font-bold text-red-500 uppercase tracking-widest">Attention Required</p>
+              <p className="text-xs text-red-200/70 mt-0.5">
+                {page.confidenceScore < 0.85 ? 'Low AI confidence.' : ''} 
+                {page.anomalyFlags && JSON.parse(page.anomalyFlags).join(', ')} detected.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* ── Current Page Info ── */}
         {page && (
           <Section title="Current Page" icon={<FileText className="w-3.5 h-3.5" />}>
             <InfoRow label="AI Label" value={page.aiLabel || '—'} />
-            <InfoRow label="Confidence" value={page.confidenceScore ? `${(page.confidenceScore * 100).toFixed(1)}%` : '—'} />
+            <InfoRow label="Confidence" value={(page.confidenceScore !== null && page.confidenceScore !== undefined) ? `${(page.confidenceScore * 100).toFixed(1)}%` : '—'} />
             <InfoRow label="Index" value={`Page ${(pages.findIndex(p => p.id === page.id)) + 1}`} />
             {page.isFlagged && (
               <div className="flex items-center gap-1.5 text-xs text-red-300 mt-1">
@@ -88,7 +108,19 @@ export default function PropertiesPanel() {
           </Section>
         )}
 
-        {/* ── Document Selector ── */}
+        {/* ── Extracted Data (The Reader) ── */}
+        {page && page.extractedData && (
+          <Section title="Extracted Entities" icon={<CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />}>
+             <div className="space-y-2">
+               {Object.entries(JSON.parse(page.extractedData)).map(([k, v]) => (
+                 <div key={k} className="bg-white/5 rounded-lg p-3 border border-white/5 group hover:border-indigo-500/30 transition-all">
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tighter">{k.replace('_', ' ')}</p>
+                    <p className="text-sm font-mono text-indigo-200 mt-1">{v}</p>
+                 </div>
+               ))}
+             </div>
+          </Section>
+        )}
         <Section title="Documents" icon={<Layers className="w-3.5 h-3.5" />}>
           <div className="space-y-1">
             {documents.map((d) => (
@@ -131,7 +163,7 @@ export default function PropertiesPanel() {
                     <option value={doc.aiLabel} className="bg-indigo-900/40">{doc.aiLabel} (Confident)</option>
                   </optgroup>
                   <optgroup label="COMMON MORTGAGE TYPES" className="text-slate-500">
-                    {DOCUMENT_TYPES.filter(t => t !== doc.aiLabel).map((t) => <option key={t} value={t}>{t}</option>)}
+                    {availableTypes.filter(t => t.code !== doc.aiLabel).map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}
                   </optgroup>
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />

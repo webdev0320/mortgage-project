@@ -1,66 +1,59 @@
-# Mortgage IDP Workbench (Local Storage + SQLite)
+# Mortgage IDP Workbench (Local Foundation)
 
-A full-stack **Intelligent Document Processing** platform for mortgage packages.
-Upload multi-page PDFs → AI classifies every page → Human analyst reviews in the HITL workspace.
+This project is a high-performance Intelligent Document Processing (IDP) platform designed to run entirely on local infrastructure.
 
----
+## Architecture
+- **Frontend**: React + Vite (Port 5173)
+- **Backend Orchestration**: Node.js + Express + Prisma + SQLite (Port 3001)
+- **AI Engine**: Python FastAPI + PaddleOCR + PyMuPDF (Port 8000)
+- **Storage**: Local filesystem (`/storage`)
 
-## Architecture (Local Version)
+## Prerequisites
+- Node.js v18+
+- Python 3.10+
 
-```
-/backend    Node.js / Express — REST API + orchestration (Serving local storage)
-/engine     Python / FastAPI  — PDF explosion + AI classification (Local disk access)
-/frontend   React / Vite      — 3-pane HITL workspace
-/storage    Local folder      — Stores blobs and processed page images
-```
+## Getting Started
 
----
-
-## Quick Start (No Docker Required)
-
-### 1. Initialize Storage
-The system will automatically create `storage/blobs` and `storage/pages` if they don't exist.
-
-### 2. Backend setup
+### 1. Backend Setup
 ```bash
 cd backend
 npm install
 npx prisma migrate dev --name init
 npm run dev
-# → http://localhost:3001
 ```
 
-### 3. Python Engine setup
+### 2. AI Engine Setup (Python)
 ```bash
 cd engine
-python -m venv .venv
-.venv\Scripts\activate        # Windows
+# Ensure .venv is active
 pip install -r requirements.txt
-uvicorn main:app --reload --port 8000
-# → http://localhost:8000
+python main.py
 ```
 
-### 4. Frontend setup
+### 3. Frontend Setup
 ```bash
 cd frontend
 npm install
 npm run dev
-# → http://localhost:5173
 ```
 
+## Features Implemented
+- **Task 1: Foundation**: Local storage in `/storage`, SQLite database via Prisma.
+- **Task 2: AI Brain**: PaddleOCR integration with local PDF-to-image conversion.
+- **Task 3: HITL UI**: Workspace with virtualized capture strip, multi-select stapling, and split/merge logic.
+- **Task 4: Export & Auditing**: Automatic audit logging for all manual actions. Final PDF re-assembly engine using PyMuPDF.
+
+## Folder Structure
+- `/storage/blobs`: Raw uploaded PDFs.
+- `/storage/pages`: Extracted page images (PNG/JPG).
+- `/storage/final`: Re-assembled final output PDFs.
+- `/backend/src/routes`: API endpoints.
+- `/engine/main.py`: AI processing and Export engine.
+
+## Hotkeys (In Workspace)
+- `Arrow Up/Down`: Navigate pages.
+- `V`: Verify & Lock.
+- `Staple`: Select multiple pages holding Ctrl/Cmd and click "Staple" in sidebar.
+
 ---
-
-## Environment Configuration
-
-### Backend (`backend/.env`)
-- `DATABASE_URL`: `file:./dev.db` (SQLite)
-- `STORAGE_PATH`: `../storage`
-- `STORAGE_URL`: `http://localhost:3001/storage`
-
-### Frontend (`frontend/.env`)
-- `VITE_STORAGE_BASE`: `http://localhost:3001/storage/pages`
-
----
-
-## AI Pipeline
-The engine uses PyMuPDF for "exploding" PDFs and a mock classifier. To use real AI (Google Doc AI / Textract), update `engine/classifier.py`.
+*Created by Antigravity AI @ Google Deepmind*

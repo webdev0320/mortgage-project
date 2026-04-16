@@ -39,10 +39,18 @@ export default function MainCanvas() {
 
         <div className="h-6 w-px bg-white/10 mx-2" />
 
-        <button id="zoom-out" className="btn-ghost p-2 text-slate-400 hover:text-white">
+        <button 
+          id="zoom-out" 
+          className="btn-ghost p-2 text-slate-400 hover:text-white"
+          onClick={() => zoomOut()}
+        >
           <ZoomOut className="w-4 h-4" />
         </button>
-        <button id="zoom-in" className="btn-ghost p-2 text-slate-400 hover:text-white">
+        <button 
+          id="zoom-in" 
+          className="btn-ghost p-2 text-slate-400 hover:text-white"
+          onClick={() => zoomIn()}
+        >
           <ZoomIn className="w-4 h-4" />
         </button>
 
@@ -52,7 +60,10 @@ export default function MainCanvas() {
           <RotateCcw className="w-4 h-4" />
         </button>
 
-        <button className="btn-ghost p-2 text-slate-400 hover:text-white">
+        <button 
+          className="btn-ghost p-2 text-slate-400 hover:text-white"
+          onClick={() => window.open(`${S3_BASE}/${page?.s3Path}`, '_blank')}
+        >
           <Download className="w-4 h-4" />
         </button>
 
@@ -139,7 +150,7 @@ export default function MainCanvas() {
 
 function ConfidenceBadge({ score }) {
   const pct = Math.round((score ?? 0) * 100)
-  const isHigh = pct >= 80
+  const isHigh = pct >= 85
   return (
     <div className={`
       px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors

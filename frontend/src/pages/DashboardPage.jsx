@@ -4,8 +4,9 @@ import { uploadBlob, fetchBlobs } from '../api/client'
 import {
   CloudUpload, FileText, Loader2, CheckCircle2,
   AlertCircle, Search, Calendar, Filter, ArrowRight,
-  MoreVertical, Clock, Check
+  MoreVertical, Clock, Check, Trash2, X
 } from 'lucide-react'
+import { deleteBlob } from '../api/client'
 
 export default function DashboardPage() {
   const navigate = useNavigate()
@@ -71,6 +72,17 @@ export default function DashboardPage() {
   const filteredBlobs = blobs.filter(b =>
     b.filename.toLowerCase().includes(search.toLowerCase())
   )
+
+  const handleDelete = async (e, id) => {
+    e.stopPropagation()
+    if (!window.confirm('Are you sure you want to delete this blob and all its data? This cannot be undone.')) return
+    try {
+      await deleteBlob(id)
+      setBlobs(curr => curr.filter(b => b.id !== id))
+    } catch (err) {
+      alert('Delete failed: ' + err.message)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[#0d0f14] text-slate-200">
@@ -150,8 +162,13 @@ export default function DashboardPage() {
               <button onClick={() => setUploads([])} className="text-xs text-slate-600 hover:text-slate-400">Clear Finished</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {uploads.map(u => (
-                <UploadCard key={u.id} upload={u} onOpen={() => navigate(`/workspace/${u.blobId}`)} />
+               {uploads.map(u => (
+                <UploadCard 
+                  key={u.id} 
+                  upload={u} 
+                  onOpen={() => navigate(`/workspace/${u.blobId}`)} 
+                  onCancel={() => setUploads(curr => curr.filter(x => x.id !== u.id))}
+                />
               ))}
             </div>
           </section>
@@ -179,7 +196,12 @@ export default function DashboardPage() {
               </div>
             ) : (
               filteredBlobs.map(blob => (
-                <BlobRow key={blob.id} blob={blob} onOpen={() => navigate(`/workspace/${blob.id}`)} />
+                <BlobRow 
+                  key={blob.id} 
+                  blob={blob} 
+                  onOpen={() => navigate(`/workspace/${blob.id}`)} 
+                  onDelete={(e) => handleDelete(e, blob.id)}
+                />
               ))
             )}
           </div>
@@ -189,7 +211,7 @@ export default function DashboardPage() {
   )
 }
 
-function UploadCard({ upload, onOpen }) {
+function UploadCard({ upload, onOpen, onCancel }) {
   const isDone = upload.status === 'done'
   const isError = upload.status === 'error'
 
@@ -208,11 +230,19 @@ function UploadCard({ upload, onOpen }) {
             <p className="text-[10px] text-slate-500">{isDone ? 'AI Classifying...' : 'Uploading...'}</p>
           </div>
         </div>
-        {isDone && (
-          <button onClick={onOpen} className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30">
-            <ArrowRight className="w-3.5 h-3.5" />
+        <div className="flex items-center gap-2">
+          {isDone && (
+            <button onClick={onOpen} className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30">
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button 
+            onClick={onCancel}
+            className="p-1.5 rounded-lg hover:bg-white/5 text-slate-500"
+          >
+            <X className="w-3.5 h-3.5" />
           </button>
-        )}
+        </div>
       </div>
 
       {!isDone && !isError && (
@@ -232,7 +262,7 @@ function UploadCard({ upload, onOpen }) {
   )
 }
 
-function BlobRow({ blob, onOpen }) {
+function BlobRow({ blob, onOpen, onDelete }) {
   const statusStyles = {
     PENDING: 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20',
     PROCESSING: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
@@ -281,8 +311,11 @@ function BlobRow({ blob, onOpen }) {
           </span>
         </div>
 
-        <button className="p-2 rounded-xl text-slate-500 hover:bg-white/5 hover:text-white transition-all">
-          <MoreVertical className="w-4 h-4" />
+        <button 
+          onClick={onDelete}
+          className="p-2 rounded-xl text-slate-500 hover:bg-red-500/10 hover:text-red-400 transition-all"
+        >
+          <Trash2 className="w-4 h-4" />
         </button>
       </div>
     </div>

@@ -6,10 +6,9 @@ const cors = require('cors');
 const { logger } = require('./utils/logger');
 const uploadRouter = require('./routes/upload');
 const blobsRouter = require('./routes/blobs');
-const blobPagesRouter = require('./routes/blobPages');
 const pagesRouter = require('./routes/pages');
 const documentsRouter = require('./routes/documents');
-const adminRouter = require('./routes/admin');
+const exportRouter = require('./routes/export');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -29,10 +28,9 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'idp-backend
 // Routes
 app.use('/api/upload', uploadRouter);
 app.use('/api/blobs', blobsRouter);
-app.use('/api/blobs', blobPagesRouter);
 app.use('/api/pages', pagesRouter);
 app.use('/api/documents', documentsRouter);
-app.use('/api/admin', adminRouter);
+app.use('/api/export', exportRouter);
 
 // Global error handler
 app.use(errorHandler);
