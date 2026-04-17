@@ -11,6 +11,7 @@ router.post('/split', async (req, res) => {
     const doc = await tx.document.create({
       data: {
         blobId,
+        userId: req.user.id,
         name: name || `Split Document`,
         documentType,
         status: 'AI_CLASSIFIED',

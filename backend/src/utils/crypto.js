@@ -4,17 +4,29 @@ const fs = require('fs');
 const ALGORITHM = 'aes-256-cbc';
 const KEY = Buffer.from('59713d2f939379854746ba1f39c0cc3f59713d2f939379854746ba1f39c0cc3f', 'hex'); // Fixed key for local dev
 
-function encryptFile(inputPath, outputPath) {
+function encryptFile(data, outputPath) {
   const iv = crypto.randomBytes(16);
   const cipher = crypto.createCipheriv(ALGORITHM, KEY, iv);
-  const input = fs.createReadStream(inputPath);
-  const output = fs.createWriteStream(outputPath);
   
-  // Write IV to the start of the file
+  // Ensure the directory exists
+  const dir = require('path').dirname(outputPath);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+  const output = fs.createWriteStream(outputPath);
   output.write(iv);
   
   return new Promise((resolve, reject) => {
-    input.pipe(cipher).pipe(output);
+    if (Buffer.isBuffer(data)) {
+      // If it's a buffer, write it through the cipher
+      const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
+      output.write(encrypted);
+      output.end();
+    } else {
+      // If it's a path, stream it
+      const input = fs.createReadStream(data);
+      input.pipe(cipher).pipe(output);
+    }
+    
     output.on('finish', () => resolve());
     output.on('error', (err) => reject(err));
   });

@@ -1,7 +1,25 @@
 const { PrismaClient } = require('@prisma/client');
+const bcrypt = require('bcryptjs');
 const prisma = new PrismaClient();
 
 async function main() {
+  // 1. Seed Admin
+  const adminEmail = 'admin@idp.local';
+  const hashedPassword = await bcrypt.hash('admin123', 10);
+  
+  await prisma.user.upsert({
+    where: { email: adminEmail },
+    update: {},
+    create: {
+      email: adminEmail,
+      password: hashedPassword,
+      name: 'System Admin',
+      role: 'ADMIN'
+    }
+  });
+  console.log('✅ Admin user seeded: admin@idp.local / admin123');
+
+  // 2. Seed Doc Types
   const types = [
     { code: 'W2', label: 'Income: IRS Form W-2', description: 'Standard annual wage and tax statement.' },
     { code: 'TAX_1040', label: 'Income: IRS Form 1040', description: 'Individual Income Tax Return (2-page standard).' },

@@ -1,14 +1,15 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { uploadBlob, fetchBlobs } from '../api/client'
+import { uploadBlob, fetchBlobs, deleteBlob } from '../api/client'
 import {
   CloudUpload, FileText, Loader2, CheckCircle2,
   AlertCircle, Search, Calendar, Filter, ArrowRight,
-  MoreVertical, Clock, Check, Trash2, X
+  MoreVertical, Clock, Check, Trash2, X, LogOut, User as UserIcon
 } from 'lucide-react'
-import { deleteBlob } from '../api/client'
+import useAuthStore from '../store/authStore'
 
 export default function DashboardPage() {
+  const { user, logout } = useAuthStore()
   const navigate = useNavigate()
   const inputRef = useRef()
   const [dragging, setDragging] = useState(false)
@@ -108,15 +109,19 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <button className="btn-ghost text-xs">
-            <Calendar className="w-4 h-4" /> Filter Date
-          </button>
-          <div className="w-px h-6 bg-white/10 mx-1" />
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20">
-            <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-            <span className="text-xs font-semibold text-indigo-300">Live Backend Connected</span>
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col items-end">
+            <span className="text-xs font-bold text-white leading-none">{user?.name || 'Operator'}</span>
+            <span className="text-[10px] text-slate-500 uppercase tracking-tighter">{user?.role}</span>
           </div>
+          
+          <button 
+            onClick={logout}
+            className="p-2.5 rounded-xl bg-white/5 text-slate-400 hover:bg-red-500/10 hover:text-red-400 transition-all border border-white/5"
+            title="Sign Out"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
       </header>
 

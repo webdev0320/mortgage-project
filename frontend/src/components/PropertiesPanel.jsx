@@ -160,10 +160,10 @@ export default function PropertiesPanel() {
                   "
                 >
                   <optgroup label="AI BEST GUESS" className="text-indigo-400">
-                    <option value={doc.aiLabel} className="bg-indigo-900/40">{doc.aiLabel} (Confident)</option>
+                    <option value={doc.documentType} className="bg-indigo-900/40">{doc.documentType} (Confident)</option>
                   </optgroup>
                   <optgroup label="COMMON MORTGAGE TYPES" className="text-slate-500">
-                    {availableTypes.filter(t => t.code !== doc.aiLabel).map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}
+                    {availableTypes.filter(t => t.code !== doc.documentType).map((t) => <option key={t.code} value={t.code}>{t.label}</option>)}
                   </optgroup>
                 </select>
                 <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 pointer-events-none" />

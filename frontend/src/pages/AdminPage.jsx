@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
-  fetchUsers, createUser, updateUser,
+  fetchUsers, createUser, updateUser, deleteUser,
   fetchConfiguredDocTypes, createConfiguredDocType, deleteConfiguredDocType
 } from '../api/client'
 import {
@@ -203,33 +203,51 @@ function UserManagement() {
                <tr key={user.id} className="group hover:bg-white/5 transition-colors">
                  <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-[10px] font-bold text-white uppercase">
+                      <div className="w-8 h-8 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px] font-bold text-indigo-400 uppercase border border-indigo-500/30">
                         {user.name?.charAt(0) || user.email.charAt(0)}
                       </div>
-                      <div>
-                        <p className="font-semibold text-white">{user.name || 'Set name'}</p>
-                        <p className="text-xs text-slate-500">{user.email}</p>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-white truncate">{user.name || 'Set name'}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{user.email}</p>
                       </div>
                     </div>
                  </td>
                  <td className="px-6 py-4">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${user.role === 'ADMIN' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 'bg-slate-500/10 text-slate-400 border-slate-500/20'}`}>
-                      {user.role}
-                    </span>
+                    <select 
+                       value={user.role} 
+                       onChange={(e) => updateUser(user.id, { role: e.target.value }).then(load)}
+                       className="bg-[#13161e] text-[10px] font-bold text-slate-400 border border-white/10 rounded-lg px-2 py-1 outline-none hover:border-indigo-500 transition-colors cursor-pointer"
+                    >
+                       <option value="OPERATOR">OPERATOR</option>
+                       <option value="ADMIN">ADMIN</option>
+                    </select>
                  </td>
                  <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
                        <span className={`w-1.5 h-1.5 rounded-full ${user.status === 'ACTIVE' ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 animate-pulse'}`} />
-                       <span className="text-slate-300 font-medium">{user.status}</span>
+                       <span className="text-[11px] text-slate-300 font-medium">{user.status}</span>
                     </div>
                  </td>
-                 <td className="px-6 py-4 text-slate-500 text-xs">
+                 <td className="px-6 py-4 text-slate-500 text-[10px] font-mono">
                     {new Date(user.createdAt).toLocaleDateString()}
                  </td>
                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => toggleStatus(user)} className="text-xs text-indigo-400 hover:text-white transition-colors underline underline-offset-4">
-                      {user.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
-                    </button>
+                   <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                     <button 
+                       onClick={() => toggleStatus(user)} 
+                       className="p-2 rounded-lg bg-white/5 text-slate-400 hover:text-white transition-colors"
+                       title={user.status === 'ACTIVE' ? 'Deactivate' : 'Activate'}
+                     >
+                        {user.status === 'ACTIVE' ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
+                     </button>
+                     <button 
+                       onClick={() => { if(confirm('Delete user?')) deleteUser(user.id).then(load) }} 
+                       className="p-2 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors"
+                       title="Delete User"
+                     >
+                        <Trash2 className="w-4 h-4" />
+                     </button>
+                   </div>
                  </td>
                </tr>
              ))}

@@ -7,14 +7,31 @@ datasource db {
   url      = "file:./dev.db"
 }
 
+model User {
+  id        String     @id @default(cuid())
+  email     String     @unique
+  password  String
+  name      String?
+  role      String     @default("OPERATOR") // ADMIN, OPERATOR
+  status    String     @default("ACTIVE")
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  blobs     Blob[]
+  documents Document[]
+
+  @@map("users")
+}
+
 model Blob {
   id        String     @id @default(cuid())
+  userId    String     // Link to the user who uploaded
   filename  String
   s3Path    String
   pageCount Int        @default(0)
   status    String     @default("PENDING")
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+  user      User       @relation(fields: [userId], references: [id])
   auditLogs AuditLog[]
   documents Document[]
   pages     Page[]
@@ -31,8 +48,8 @@ model Page {
   confidenceScore Float?
   isFlagged       Boolean        @default(false)
   rotation        Int            @default(0)
-  anomalyFlags    String?        // JSON string of quality issues (skew, blur, etc)
-  extractedData   String?        // JSON string of KVP (Box1, EIN, etc)
+  anomalyFlags    String?        
+  extractedData   String?        
   createdAt       DateTime       @default(now())
   updatedAt       DateTime       @updatedAt
   documentPages   DocumentPage[]
@@ -42,25 +59,16 @@ model Page {
   @@map("pages")
 }
 
-model ClassificationCorrection {
-  id               String   @id @default(cuid())
-  blobId           String
-  originalAiLabel  String
-  finalHumanLabel  String
-  pageThumbnailPath String
-  createdAt        DateTime @default(now())
-
-  @@map("classification_corrections")
-}
-
 model Document {
   id           String         @id @default(cuid())
+  userId       String
   blobId       String
   name         String
   documentType String
   status       String         @default("AI_CLASSIFIED")
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @updatedAt
+  user         User           @relation(fields: [userId], references: [id])
   auditLogs    AuditLog[]
   pages        DocumentPage[]
   blob         Blob           @relation(fields: [blobId], references: [id], onDelete: Cascade)
@@ -92,18 +100,6 @@ model AuditLog {
   blob        Blob      @relation(fields: [blobId], references: [id], onDelete: Cascade)
 
   @@map("audit_logs")
-}
-
-model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  role      String   @default("OPERATOR")
-  status    String   @default("ACTIVE")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@map("users")
 }
 
 model ConfiguredDocType {

@@ -1,6 +1,9 @@
 import axios from 'axios'
 
-const api = axios.create({ baseURL: '/api' })
+const api = axios.create({ 
+  baseURL: '/api',
+  withCredentials: true 
+})
 
 export const uploadBlob = (file, onProgress) => {
   const form = new FormData()
@@ -22,9 +25,10 @@ export const renameDocument = (id, payload) => api.patch(`/documents/${id}/renam
 
 // Admin
 export const fetchUsers = () => api.get('/admin/users')
-export const createUser = (data) => api.post('/admin/users', data)
+export const createUser = (data) => api.post('/auth/register', data) // For creating user accounts
 export const updateUser = (id, data) => api.patch(`/admin/users/${id}`, data)
+export const deleteUser = (id) => api.delete(`/admin/users/${id}`)
 
-export const fetchConfiguredDocTypes = () => api.get('/admin/document-types')
-export const createConfiguredDocType = (data) => api.post('/admin/document-types', data)
-export const deleteConfiguredDocType = (id) => api.delete(`/admin/document-types/${id}`)
+export const fetchConfiguredDocTypes = () => api.get('/admin/doc-types')
+export const createConfiguredDocType = (data) => api.post('/admin/doc-types', data)
+export const deleteConfiguredDocType = (id) => api.delete(`/admin/doc-types/${id}`)

@@ -46,14 +46,22 @@ router.post('/', upload.single('file'), async (req, res) => {
     
     logger.info(`Blob encrypted and stored at ${filePath}`);
 
-    // 2. Create Blob record in Postgres
+    // 2. Create Blob record in DB
+    if (!req.user || !req.user.id) {
+       logger.error('Upload attempted without valid user session');
+       return res.status(401).json({ success: false, message: 'User session required' });
+    }
+
     const blob = await prisma.blob.create({
       data: {
+        userId: req.user.id,
         filename: req.file.originalname,
-        s3Path: fileName, // We'll keep the column name but store the filename
+        s3Path: fileName,
         status: 'PROCESSING',
       },
     });
+    
+    logger.info(`Blob ${blob.id} created for user ${req.user.id}. Starting engine...`);
 
     logger.info(`Blob DB record created: ${blob.id}`);
 

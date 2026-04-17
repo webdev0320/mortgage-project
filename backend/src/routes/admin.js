@@ -1,115 +1,94 @@
 const express = require('express');
 const { prisma } = require('../lib/prisma');
-const { logger } = require('../utils/logger');
+const { authMiddleware, adminMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
 
-// ── Users ──
+// Apply auth protection to all routes in this file
+router.use(authMiddleware);
 
-/**
- * GET /api/admin/users
- * List all users
- */
-router.get('/users', async (req, res) => {
+// --- USER MANAGEMENT ---
+
+// GET /api/admin/users - List all employees
+router.get('/users', adminMiddleware, async (req, res) => {
   try {
     const users = await prisma.user.findMany({
-      orderBy: { createdAt: 'desc' }
+      orderBy: { createdAt: 'desc' },
+      include: {
+        _count: {
+          select: { blobs: true, documents: true }
+        }
+      }
     });
-    res.json({ success: true, data: users });
+    // Remove passwords before sending
+    const safeUsers = users.map(u => {
+      const { password, ...safe } = u;
+      return safe;
+    });
+    res.json({ success: true, data: safeUsers });
   } catch (err) {
-    logger.error(`Failed to fetch users: ${err.message}`);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-/**
- * POST /api/admin/users
- * Create a new user
- */
-router.post('/users', async (req, res) => {
-  const { email, name, role } = req.body;
-  try {
-    const user = await prisma.user.create({
-      data: { email, name, role: role || 'OPERATOR' }
-    });
-    res.status(201).json({ success: true, data: user });
-  } catch (err) {
-    logger.error(`Failed to create user: ${err.message}`);
-    res.status(400).json({ success: false, message: err.message });
-  }
-});
-
-/**
- * PATCH /api/admin/users/:id
- * Update user status or role
- */
-router.patch('/users/:id', async (req, res) => {
-  const { id } = req.params;
-  const { status, role } = req.body;
+// PATCH /api/admin/users/:id - Update user role or status
+router.patch('/users/:id', adminMiddleware, async (req, res) => {
+  const { role, status, name } = req.body;
   try {
     const user = await prisma.user.update({
-      where: { id },
-      data: { status, role }
+      where: { id: req.params.id },
+      data: { role, status, name }
     });
     res.json({ success: true, data: user });
   } catch (err) {
-    logger.error(`Failed to update user: ${err.message}`);
-    res.status(400).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// ── Document Types ──
+// DELETE /api/admin/users/:id - Remove user
+router.delete('/users/:id', adminMiddleware, async (req, res) => {
+  try {
+    await prisma.user.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
-/**
- * GET /api/admin/document-types
- * List configured doc types
- */
-router.get('/document-types', async (req, res) => {
+// --- DOCUMENT TEMPLATES (SCHEMA CONFIG) ---
+
+// GET /api/admin/doc-types
+router.get('/doc-types', async (req, res) => {
   try {
     const types = await prisma.configuredDocType.findMany({
       orderBy: { label: 'asc' }
     });
     res.json({ success: true, data: types });
   } catch (err) {
-    logger.error(`Failed to fetch doc types: ${err.message}`);
-    res.status(500).json({ success: false, message: 'Internal server error' });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-/**
- * POST /api/admin/document-types
- * Create a new configured doc type
- */
-router.post('/document-types', async (req, res) => {
+// POST /api/admin/doc-types - Add new template
+router.post('/doc-types', adminMiddleware, async (req, res) => {
   const { code, label, description, isCommon } = req.body;
-  logger.info(`Attempting to create doc type: ${JSON.stringify(req.body)}`);
   try {
     const type = await prisma.configuredDocType.create({
-      data: { 
-        code: code || `CODE_${Date.now()}`, 
-        label: label || 'Unnamed Type', 
-        description: description || '',
-        isCommon: !!isCommon 
-      }
+      data: { code, label, description, isCommon }
     });
-    res.status(201).json({ success: true, data: type });
+    res.json({ success: true, data: type });
   } catch (err) {
-    logger.error(`Failed to create doc type: ${err.message}`, { stack: err.stack, body: req.body });
-    res.status(400).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-/**
- * DELETE /api/admin/document-types/:id
- */
-router.delete('/document-types/:id', async (req, res) => {
-  const { id } = req.params;
+// DELETE /api/admin/doc-types/:id
+router.delete('/doc-types/:id', adminMiddleware, async (req, res) => {
   try {
-    await prisma.configuredDocType.delete({ where: { id } });
+    await prisma.configuredDocType.delete({ where: { id: req.params.id } });
     res.json({ success: true });
   } catch (err) {
-    logger.error(`Failed to delete doc type: ${err.message}`);
-    res.status(400).json({ success: false, message: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 

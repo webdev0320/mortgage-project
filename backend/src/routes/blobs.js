@@ -7,8 +7,9 @@ const { logger } = require('../utils/logger');
 const router = express.Router();
 
 // GET /api/blobs — list all blobs
-router.get('/', async (_req, res) => {
+router.get('/', async (req, res) => {
   const blobs = await prisma.blob.findMany({
+    where: { userId: req.user.id },
     orderBy: { createdAt: 'desc' },
     include: { _count: { select: { pages: true, documents: true } } },
   });
@@ -77,7 +78,16 @@ router.post('/:id/pages', async (req, res) => {
         },
       });
 
-      // Auto-create one Document per page (Initial AI state)
+      // Sort pages to ensure we process them in consecutive order
+      pages.sort((a, b) => a.page_index - b.page_index);
+
+      let currentDoc = null;
+      let currentLabel = null;
+      let orderCounter = 0;
+
+      // Auto-create Documents dynamically (group consecutive pages of the same type)
+      const blobData = await tx.blob.findUnique({ where: { id } });
+      
       for (const p of pages) {
         const page = await tx.page.findUnique({
           where: { blobId_pageIndex: { blobId: id, pageIndex: p.page_index } },
@@ -88,18 +98,27 @@ router.post('/:id/pages', async (req, res) => {
         const existingDP = await tx.documentPage.findFirst({ where: { pageId: page.id } });
         if (existingDP) continue;
 
-        const doc = await tx.document.create({
-          data: {
-            blobId: id,
-            name: `${p.ai_label || 'Document'} (p.${p.page_index + 1})`,
-            documentType: p.ai_label || 'Unknown',
-            status: 'AI_CLASSIFIED',
-          },
-        });
+        // If the label changes, create a new logical document
+        if (p.ai_label !== currentLabel) {
+          currentLabel = p.ai_label;
+          orderCounter = 0;
+          currentDoc = await tx.document.create({
+            data: {
+              userId: blobData.userId,
+              blobId: id,
+              name: `${currentLabel || 'Document'} Package`,
+              documentType: currentLabel || 'Unknown',
+              status: 'AI_CLASSIFIED',
+            },
+          });
+        }
 
-        await tx.documentPage.create({
-          data: { documentId: doc.id, pageId: page.id, order: 0 },
-        });
+        // Attach page to the current active document
+        if (currentDoc) {
+          await tx.documentPage.create({
+            data: { documentId: currentDoc.id, pageId: page.id, order: orderCounter++ },
+          });
+        }
       }
       await tx.auditLog.create({
         data: {

@@ -1,4 +1,7 @@
 import os
+os.environ['FLAGS_use_mkldnn'] = '0'
+os.environ['PADDLE_ONEDNN'] = 'OFF'
+os.environ['FLAGS_enable_new_executor'] = '0'
 from paddleocr import PaddleOCR
 import fitz  # PyMuPDF
 import numpy as np  
@@ -15,11 +18,7 @@ DOCUMENT_TYPES = {
     "LS": ["loan submission sheet"]
 }
 
-ocr = PaddleOCR(
-    use_textline_orientation=True,
-    lang='en',
-    device='cpu',
-)
+ocr = PaddleOCR(lang='en')
 
 def classify_page(text_blocks):
     full_text = " ".join([block['text'] for block in text_blocks]).lower()
@@ -98,7 +97,7 @@ def process_pdf_with_ocr(pdf_path, output_file, ocr):
         img = Image.open(io.BytesIO(pix.tobytes("png")))
         img_np = np.array(img)
 
-        result = ocr.ocr(img_np, cls=True)
+        result = ocr.predict(img_np)
         
         page_text = []
         
