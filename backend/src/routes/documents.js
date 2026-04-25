@@ -7,17 +7,27 @@ const router = express.Router();
 router.post('/split', async (req, res) => {
   const { blobId, pageIds, documentType, name } = req.body;
 
-  const document = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Remove these pages from any existing documents in this blob
+    await tx.documentPage.deleteMany({
+      where: {
+        pageId: { in: pageIds },
+        document: { blobId }
+      }
+    });
+
+    // 2. Create the new document
     const doc = await tx.document.create({
       data: {
         blobId,
         userId: req.user.id,
         name: name || `Split Document`,
-        documentType,
+        documentType: documentType || 'Unknown',
         status: 'AI_CLASSIFIED',
       },
     });
 
+    // 3. Attach pages to the new document
     await tx.documentPage.createMany({
       data: pageIds.map((pageId, idx) => ({
         documentId: doc.id,
@@ -25,6 +35,20 @@ router.post('/split', async (req, res) => {
         order: idx,
       })),
     });
+
+    // 4. Cleanup: Delete documents that no longer have any pages
+    const emptyDocs = await tx.document.findMany({
+      where: {
+        blobId,
+        pages: { none: {} }
+      }
+    });
+
+    if (emptyDocs.length > 0) {
+      await tx.document.deleteMany({
+        where: { id: { in: emptyDocs.map(d => d.id) } }
+      });
+    }
 
     await tx.auditLog.create({
       data: {
@@ -35,10 +59,21 @@ router.post('/split', async (req, res) => {
       },
     });
 
-    return doc;
+    // Fetch all documents for this blob to keep frontend in sync
+    const allDocs = await tx.document.findMany({
+      where: { blobId },
+      include: { pages: { include: { page: true }, orderBy: { order: 'asc' } } },
+      orderBy: { createdAt: 'asc' }
+    });
+
+    return { doc, allDocs };
   });
 
-  res.status(201).json({ success: true, data: document });
+  res.status(201).json({ 
+    success: true, 
+    data: result.doc, 
+    allDocuments: result.allDocs 
+  });
 });
 
 // POST /api/documents/merge — merge two documents into one
