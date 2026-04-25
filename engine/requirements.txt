@@ -1,5 +1,4 @@
-paddlepaddle
-paddleocr
+easyocr
 pymupdf
 numpy
 pillow
@@ -9,3 +8,5 @@ uvicorn
 pydantic
 requests
 python-dotenv
+scikit-learn
+opencv-python-headless

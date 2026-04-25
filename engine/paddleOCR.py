@@ -1,29 +1,158 @@
-import os
-os.environ['FLAGS_use_mkldnn'] = '0'
-os.environ['PADDLE_ONEDNN'] = 'OFF'
-os.environ['FLAGS_enable_new_executor'] = '0'
-from paddleocr import PaddleOCR
-import fitz  # PyMuPDF
-import numpy as np  
-from PIL import Image
-import io
-import traceback
+# Classification module — no OCR dependency.
+# Uses rapidfuzz for fuzzy keyword matching against DOCUMENT_TYPES.
 from rapidfuzz import fuzz
+import traceback
 
 # document dictionary
 DOCUMENT_TYPES = {
-    "GFE": ["good faith estimate"],
-    "URLA": ["uniform residential loan application"],
-    "TIA": ["tax information authorization"],
-    "LS": ["loan submission sheet"]
+    # Existing documents with additional aliases
+    "GFE": [
+        "good faith estimate",
+        "good faith estimate gfe",
+        "hud gfe",
+        "gfe form"
+    ],
+    "URLA": [
+        "uniform residential loan application",
+        "urla form",
+        "1003",
+        "freddie mac form 65",
+        "fannie mae form 1003",
+        "uniform residential loan application urla",
+        "residential loan application"
+    ],
+    "TIA": [
+        "tax information authorization",
+        "tax information authorization form",
+        "irs form 4506",
+        "4506",
+        "irs 4506",
+        "form 4506",
+        "tax return authorization"
+    ],
+    "LS": [
+        "loan submission sheet",
+        "loan submission sheet lss",
+        "submission sheet",
+        "loan transmittal sheet"
+    ],
+    
+    # New documents added
+    "DEMO": [  # Demographic Information Addendum
+        "demographic information addendum",
+        "demographic addendum",
+        "hmda demographic information addendum",
+        "uniform residential loan application demographic addendum",
+        "borrower demographic information",
+        "demographic information form"
+    ],
+    "UUTS": [  # Uniform Underwriting and Transmittal Summary
+        "uniform underwriting and transmittal summary",
+        "uniform underwriting transmittal summary",
+        "fannie mae form 1077",
+        "freddie mac form 1008",
+        "form 1077",
+        "form 1008",
+        "underwriting and transmittal summary",
+        "uw transmittal summary"
+    ],
+    "RTTR": [  # Request for Transcript of Tax Return
+        "request for transcript of tax return",
+        "irs form 4506-c",
+        "form 4506-c",
+        "4506-c",
+        "irs 4506c",
+        "request for tax return transcript",
+        "tax transcript request",
+        "irs tax return transcript request",
+        "form 4506c"
+    ],
+    "URAR": [  # Uniform Residential Appraisal Report
+        "uniform residential appraisal report",
+        "urar",
+        "fannie mae form 1004",
+        "freddie mac form 70",
+        "form 1004",
+        "form 70",
+        "uniform appraisal report",
+        "residential appraisal report",
+        "1004 appraisal form"
+    ],
+    "SA": [  # Supplemental Addendum
+        "supplemental addendum",
+        "multi purpose supplemental addendum",
+        "supplemental appraisal addendum",
+        "form 1004 supplemental addendum",
+        "urar supplemental addendum",
+        "appraisal supplemental addendum"
+    ],
+    "MCA": [  # Market Conditions Addendum to the Appraisal Report
+        "market conditions addendum to the appraisal report",
+        "market conditions addendum",
+        "fannie mae form 1004mc",
+        "form 1004mc",
+        "1004mc",
+        "market conditions addendum appraisal",
+        "appraisal market conditions addendum",
+        "market conditions addendum urar"
+    ],
+    "UAD_DEF": [  # UNIFORM APPRAISAL DATASET (UAD) DEFINITIONS ADDENDUM
+        "uniform appraisal dataset definitions addendum",
+        "uad definitions addendum",
+        "uniform appraisal dataset definitions",
+        "uad definitions",
+        "uad addendum",
+        "form 1004 uad definitions addendum",
+        "uad appraisal definitions addendum"
+    ],
+    "E&O": [  # REAL ESTATE APPRAISERS ERRORS & OMISSIONS INSURANCE POLICY DECLARATIONS PAGE
+        "real estate appraisers errors & omissions insurance policy declarations page",
+        "eo insurance policy declarations page",
+        "appraisers errors and omissions insurance declarations",
+        "eo declarations page",
+        "appraiser professional liability insurance declarations page",
+        "errors and omissions insurance policy appraisers",
+        "appraiser e&o policy declarations"
+    ],
+    "APP_LICENSE": [  # REAL ESTATE APPRAISER LICENSE
+        "real estate appraiser license",
+        "appraiser license",
+        "appraisal license",
+        "state appraiser license",
+        "appraiser certification",
+        "certified real estate appraiser license",
+        "professional appraiser license",
+        "appraiser license certificate",
+        "state certified appraiser license"
+    ],
+    "COA": [  # Certificate of Appraiser Independence
+        "certificate of appraiser independence",
+        "appraiser independence certificate",
+        "coa",
+        "certificate of independence appraiser",
+        "appraiser independence certification",
+        "air certificate",
+        "appraiser independence requirements certificate",
+        "certificate of appraiser independence form"
+    ]
 }
 
-ocr = PaddleOCR(lang='en')
 
 def classify_page(text_blocks):
+    """
+    Classifies a page based on its OCR text blocks using fuzzy keyword matching.
+
+    Args:
+        text_blocks: list of dicts with a 'text' key.
+
+    Returns:
+        tuple: (label: str, confidence: float)
+            - label is a key from DOCUMENT_TYPES, or "UNCLASSIFIED"
+            - confidence is a float between 0.0 and 1.0
+    """
     full_text = " ".join([block['text'] for block in text_blocks]).lower()
 
-    best_match = "UNKNOWN"
+    best_match = "UNCLASSIFIED"
     best_score = 0
 
     for doc_type, keywords in DOCUMENT_TYPES.items():
@@ -34,11 +163,12 @@ def classify_page(text_blocks):
                 best_score = score
                 best_match = doc_type
 
-    # Threshold check
+    # Threshold check: score must exceed 80 to be considered a match
     if best_score > 80:
-        return best_match
+        return best_match, round(best_score / 100, 2)
     else:
-        return "UNKNOWN"
+        return "UNCLASSIFIED", round(best_score / 100, 2)
+
 
 
 

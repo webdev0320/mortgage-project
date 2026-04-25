@@ -26,8 +26,12 @@ npm run dev
 ```bash
 cd engine
 # Ensure .venv is active
-pip install -r requirements.txt
-python main.py
+.\.venv\Scripts\activate
+cd engine   
+python -m pip install cryptography
+python main.py  
+
+
 ```
 
 ### 3. Frontend Setup

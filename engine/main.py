@@ -9,7 +9,13 @@ os.environ['OMP_NUM_THREADS'] = '1'
 import shutil
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from pydantic import BaseModel
-from paddleOCR import process_pdf_with_ocr, ocr
+import easyocr
+from paddleOCR import classify_page
+
+# Initialize EasyOCR once at startup (gpu=False for Windows CPU compatibility)
+print("Loading EasyOCR model...")
+reader = easyocr.Reader(['en'], gpu=False)
+print("EasyOCR ready.")
 import requests
 import cv2
 import numpy as np
@@ -175,39 +181,34 @@ def run_pipeline(blob_id: str, pdf_path: str):
             pdf_text = page.get_text("text").strip()
             
             try:
-                if len(pdf_text) > 20: # If it's a native digital document, skip OCR completely!
+                if len(pdf_text) > 20:  # Native digital PDF — skip OCR
                     ocr_text = pdf_text
                     res = "NativeTextExtractor"
+                    print(f"  [Page {page_num}] Native text ({len(pdf_text)} chars). Preview: {pdf_text[:120].replace(chr(10), ' ')!r}")
                 else:
-                    # Run heavy OCR for scanned images/faxes
-                    res = ocr.predict(image_path)
-                    ocr_text = " ".join([line[1][0] for line in res[0]]) if res and res[0] else ""
+                    # Scanned page — run EasyOCR
+                    print(f"  [Page {page_num}] No embedded text. Running EasyOCR...")
+                    res = reader.readtext(image_path)  # returns [[bbox, text, confidence], ...]
+                    ocr_text = " ".join([item[1] for item in res]) if res else ""
+                    print(f"  [Page {page_num}] EasyOCR result ({len(ocr_text)} chars). Preview: {ocr_text[:120]!r}")
             except Exception as ocr_err:
-                print(f"[WARNING] AI Engine encountered an execution gap. Using Fail-Safe Mock: {str(ocr_err)}")
-                
-                # Dynamic Mock Classification based on Page Index (for scanned files hitting the C++ limit)
-                page_idx = i + 1
-                if page_idx <= 2:
-                    ocr_text = "EARNINGS STATEMENT PAY STUB"
-                elif page_idx <= 4:
-                    ocr_text = "WAGE AND TAX STATEMENT W-2"
-                elif page_idx <= 6:
-                    ocr_text = "INDIVIDUAL INCOME TAX RETURN 1040"
-                else:
-                    ocr_text = "UNIFORM RESIDENTIAL LOAN APPLICATION 1003"
-                    
+                print(f"[WARNING] OCR failed on page {page_num}: {str(ocr_err)}")
+                ocr_text = ""
                 res = None
 
-            # Simple keyword classification
-            ai_label = "UNCLASSIFIED"
-            ocr_text_upper = ocr_text.upper()
-            if "W-2" in ocr_text_upper or "WAGE AND TAX" in ocr_text_upper: ai_label = "W2"
-            elif "PAY STUB" in ocr_text_upper or "EARNINGS" in ocr_text_upper: ai_label = "PAYSTUB"
-            elif "1040" in ocr_text_upper or "INDIVIDUAL INCOME" in ocr_text_upper: ai_label = "TAX_1040"
-            elif "URLA" in ocr_text_upper or "1003" in ocr_text_upper: ai_label = "URLA_1003"
-            
-            # Confidence & Flags
-            confidence = 0.92 if res else 0.75
+            # --- Rich fuzzy classification via paddleOCR.py ---
+            if res and res != "NativeTextExtractor":
+                # EasyOCR result: [[bbox, text, confidence], ...]
+                text_blocks = [{'text': item[1], 'confidence': item[2]} for item in res]
+            else:
+                # Native PDF text or empty: wrap as a single block
+                text_blocks = [{'text': ocr_text, 'confidence': 1.0}]
+
+            ai_label, fuzzy_confidence = classify_page(text_blocks)
+            print(f"  [Page {page_num}] classify_page -> label={ai_label}, fuzzy_score={fuzzy_confidence:.2f}")
+
+            # Use real fuzzy score as confidence; penalise slightly if OCR itself failed
+            confidence = fuzzy_confidence if res else max(fuzzy_confidence - 0.1, 0.0)
             should_flag = confidence < 0.85 or len(anomalies) > 0
             
             # Extraction
