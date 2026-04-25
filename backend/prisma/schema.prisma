@@ -29,6 +29,7 @@ model Blob {
   s3Path    String
   pageCount Int        @default(0)
   status    String     @default("PENDING")
+  progress  Int        @default(0)
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   user      User       @relation(fields: [userId], references: [id])

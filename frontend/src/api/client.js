@@ -32,3 +32,7 @@ export const deleteUser = (id) => api.delete(`/admin/users/${id}`)
 export const fetchConfiguredDocTypes = () => api.get('/admin/doc-types')
 export const createConfiguredDocType = (data) => api.post('/admin/doc-types', data)
 export const deleteConfiguredDocType = (id) => api.delete(`/admin/doc-types/${id}`)
+
+// Demo Files
+export const fetchDemoFiles = () => api.get('/demo/files')
+export const ingestDemoFile = (filename) => api.post('/demo/ingest', { filename })

@@ -13,7 +13,8 @@ const blobsRouter = require('./routes/blobs');
 const pagesRouter = require('./routes/pages');
 const documentsRouter = require('./routes/documents');
 const exportRouter = require('./routes/export');
-const adminRouter = require('./routes/admin'); // I'll create this or use configuredDocTypes here
+const adminRouter = require('./routes/admin');
+const demoRouter = require('./routes/demo');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -48,7 +49,8 @@ app.use('/api/blobs', (req, res, next) => {
 app.use('/api/pages', authMiddleware, pagesRouter);
 app.use('/api/documents', authMiddleware, documentsRouter);
 app.use('/api/export', authMiddleware, exportRouter);
-app.use('/api/admin', adminRouter); // Middleware is inside the router
+app.use('/api/admin', adminRouter);
+app.use('/api/demo', demoRouter);
 
 // Global error handler
 app.use(errorHandler);
