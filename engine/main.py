@@ -112,13 +112,14 @@ async def export_documents(req: ExportRequest):
     try:
         import fitz
         exported_files = []
-        os.makedirs(os.path.join(STORAGE_DIR, "final"), exist_ok=True)
+        export_folder = os.path.join(STORAGE_DIR, "final", req.blob_id)
+        os.makedirs(export_folder, exist_ok=True)
         
         for item in req.manifest:
             # item: {documentId, documentName, pages: [s3Path]}
             doc_name_clean = "".join([c for c in item['documentName'] if c.isalnum() or c in (' ', '-', '_')]).strip()
             output_filename = f"{doc_name_clean}_{item['documentId'][:8]}.pdf"
-            output_path = os.path.join(STORAGE_DIR, "final", output_filename)
+            output_path = os.path.join(export_folder, output_filename)
             
             new_pdf = fitz.open() 
             for page_s3_path in item['pages']:
@@ -137,6 +138,46 @@ async def export_documents(req: ExportRequest):
             exported_files.append(output_filename)
         
         print(f"[SUCCESS] Exported {len(exported_files)} PDFs for Blob {req.blob_id}")
+
+        # --- SFTP UPLOAD LOGIC ---
+        sftp_host = os.getenv("SFTP_HOST")
+        sftp_port = os.getenv("SFTP_PORT", "22")
+        sftp_user = os.getenv("SFTP_USERNAME")
+        sftp_pass = os.getenv("SFTP_PASSWORD")
+        
+        if sftp_host and sftp_user and sftp_pass:
+            import paramiko
+            print(f"[SFTP] Connecting to {sftp_host}:{sftp_port}...")
+            try:
+                transport = paramiko.Transport((sftp_host, int(sftp_port)))
+                transport.connect(username=sftp_user, password=sftp_pass)
+                sftp = paramiko.SFTPClient.from_transport(transport)
+                
+                # Ensure /Outbound exists
+                try:
+                    sftp.mkdir("/Outbound")
+                except IOError:
+                    pass
+
+                # Create remote directory for this blob if it doesn't exist
+                remote_folder = f"/Outbound/{req.blob_id}"
+                try:
+                    sftp.mkdir(remote_folder)
+                except IOError:
+                    pass # Directory might already exist
+                
+                for filename in exported_files:
+                    local_path = os.path.join(export_folder, filename)
+                    remote_path = f"{remote_folder}/{filename}"
+                    print(f"[SFTP] Uploading {filename} to {remote_path}...")
+                    sftp.put(local_path, remote_path)
+                
+                sftp.close()
+                transport.close()
+                print(f"[SUCCESS] SFTP Upload completed.")
+            except Exception as sftp_e:
+                print(f"[ERROR] SFTP Upload failed: {sftp_e}")
+
         return {"success": True, "files": exported_files}
         
     except Exception as e:

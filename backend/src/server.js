@@ -6,6 +6,7 @@ const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const { logger } = require('./utils/logger');
 const { authMiddleware } = require('./middleware/auth');
+const { initSftpPoller } = require('./services/sftpPoller');
 
 const authRouter = require('./routes/auth');
 const uploadRouter = require('./routes/upload');
@@ -52,6 +53,9 @@ app.use('/api/admin', adminRouter); // Middleware is inside the router
 
 // Global error handler
 app.use(errorHandler);
+
+// Initialize background services
+initSftpPoller();
 
 app.listen(PORT, () => {
   logger.info(`🚀 IDP Backend running on http://localhost:${PORT}`);
