@@ -49,12 +49,12 @@ router.post('/:blobId', async (req, res) => {
       data: {
         blobId,
         action: 'EXPORT',
-        payload: JSON.stringify({ filename: response.data.final_pdf }),
+        payload: JSON.stringify({ files: response.data.files }),
         performedBy: 'human'
       }
     });
 
-    res.json({ success: true, final_pdf: response.data.final_pdf });
+    res.json({ success: true, files: response.data.files });
   } catch (err) {
     logger.error(`Export failed for ${blobId}: ${err.message}`);
     res.status(500).json({ success: false, error: err.message });

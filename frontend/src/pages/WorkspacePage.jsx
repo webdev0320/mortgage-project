@@ -62,7 +62,7 @@ export default function WorkspacePage() {
               try {
                 const { data } = await axios.post(`/api/export/${blobId}`)
                 if (data.success) {
-                   alert(`Success! Generated ${data.files.length} documents:\n${data.files.join('\n')}\n\nFiles saved in storage/final folder.`)
+                   alert(`Success! Generated ${data.files.length} documents:\n${data.files.join('\n')}\n\nFiles have been securely pushed to your SFTP /Outbound folder.`)
                 }
               } catch (e) {
                 alert('Export failed. Check engine logs.')

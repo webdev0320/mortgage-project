@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { uploadBlob, fetchBlobs, deleteBlob, fetchDemoFiles, ingestDemoFile } from '../api/client'
+import { uploadBlob, fetchBlobs, fetchInboundFiles, deleteBlob } from '../api/client'
 import {
   CloudUpload, FileText, Loader2, CheckCircle2,
-  AlertCircle, Search, Calendar, Filter, ArrowRight,
+  AlertCircle, Search, Calendar, Filter, ArrowRight, Settings,
   MoreVertical, Clock, Check, Trash2, X, LogOut, User as UserIcon
 } from 'lucide-react'
 import useAuthStore from '../store/authStore'
@@ -18,37 +18,25 @@ export default function DashboardPage() {
   const [search, setSearch] = useState('')
   const [loadingBlobs, setLoadingBlobs] = useState(true)
 
+  const [inboundFiles, setInboundFiles] = useState([])
+
   useEffect(() => {
     loadBlobs()
-    loadDemoFiles()
-
-    // Adaptive polling: fast when jobs are active, slow when idle
-    let interval
-    const scheduleNext = (blobList) => {
-      clearInterval(interval)
-      const hasActive = blobList.some(b => b.status === 'PROCESSING' || b.status === 'EXPLODED')
-      const delay = hasActive ? 2000 : 10000
-      interval = setInterval(async () => {
-        const { data } = await fetchBlobs().catch(() => ({ data: { data: [] } }))
-        setBlobs(data.data)
-        scheduleNext(data.data)
-      }, delay)
-    }
-
-    // Bootstrap: fetch once then set adaptive interval
-    fetchBlobs()
-      .then(({ data }) => { setBlobs(data.data); scheduleNext(data.data) })
-      .catch(() => {})
-
+    loadInboundFiles()
+    const interval = setInterval(() => {
+      loadBlobs()
+      loadInboundFiles()
+    }, 5000)
     return () => clearInterval(interval)
   }, [])
 
-  const [demoFiles, setDemoFiles] = useState([])
-  const loadDemoFiles = async () => {
+  const loadInboundFiles = async () => {
     try {
-      const { data } = await fetchDemoFiles()
-      setDemoFiles(data.data)
-    } catch (e) { console.error(e) }
+      const { data } = await fetchInboundFiles()
+      setInboundFiles(data.data)
+    } catch (e) {
+      console.error('Failed to load inbound files', e)
+    }
   }
 
   const loadBlobs = async () => {
@@ -83,24 +71,11 @@ export default function DashboardPage() {
         const { data } = await uploadBlob(file, (p) => {
           setUploads(curr => curr.map(u => u.id === trackerId ? { ...u, progress: p } : u))
         })
-        setUploads(curr => curr.map(u => u.id === trackerId ? { ...u, status: 'done', blobId: data.blob.id } : u))
-        loadBlobs()
+        setUploads(curr => curr.map(u => u.id === trackerId ? { ...u, status: 'done', message: 'Sent to SFTP' } : u))
+        loadInboundFiles()
       } catch (e) {
         setUploads(curr => curr.map(u => u.id === trackerId ? { ...u, status: 'error', error: e.message } : u))
       }
-    }
-  }
-
-  const handleIngest = async (filename) => {
-    const trackerId = Math.random().toString(36).substr(2, 9)
-    setUploads(prev => [{ id: trackerId, name: filename, progress: 100, status: 'done' }, ...prev])
-    
-    try {
-      const { data } = await ingestDemoFile(filename)
-      setUploads(curr => curr.map(u => u.id === trackerId ? { ...u, blobId: data.blob.id } : u))
-      loadBlobs()
-    } catch (e) {
-      setUploads(curr => curr.map(u => u.id === trackerId ? { ...u, status: 'error', error: e.message } : u))
     }
   }
 
@@ -150,6 +125,15 @@ export default function DashboardPage() {
         </div>
 
         <div className="flex items-center gap-4">
+          {user?.role === 'ADMIN' && (
+            <button 
+              onClick={() => navigate('/admin')}
+              className="mr-2 px-4 py-2 rounded-xl bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 hover:text-indigo-300 transition-all border border-indigo-500/20 text-xs font-bold flex items-center gap-2"
+            >
+              <Settings className="w-4 h-4" /> Admin Console
+            </button>
+          )}
+
           <div className="flex flex-col items-end">
             <span className="text-xs font-bold text-white leading-none">{user?.name || 'Operator'}</span>
             <span className="text-[10px] text-slate-500 uppercase tracking-tighter">{user?.role}</span>
@@ -211,7 +195,6 @@ export default function DashboardPage() {
                 <UploadCard 
                   key={u.id} 
                   upload={u} 
-                  blob={blobs.find(b => b.id === u.blobId)}
                   onOpen={() => navigate(`/workspace/${u.blobId}`)} 
                   onCancel={() => setUploads(curr => curr.filter(x => x.id !== u.id))}
                 />
@@ -220,29 +203,24 @@ export default function DashboardPage() {
           </section>
         )}
 
-        {/* Server Repository (Demo Files) */}
-        {demoFiles.length > 0 && (
-          <section className="space-y-6">
-            <div className="flex items-center justify-between border-b border-white/5 pb-4">
-              <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500">Server Repository (demo_file)</h3>
-              <span className="text-[10px] text-indigo-400 font-mono animate-pulse">DIRECT INGEST AVAILABLE</span>
+        {/* SFTP Inbound Files Monitoring */}
+        {inboundFiles.length > 0 && (
+          <section className="fade-up space-y-4">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <h3 className="text-sm font-semibold uppercase tracking-widest text-slate-500">SFTP Inbound Queue</h3>
+              <div className="flex items-center gap-2 text-xs text-slate-500 font-mono">
+                Queued: {inboundFiles.length}
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {demoFiles.map(file => (
-                <div 
-                  key={file.name}
-                  className="p-5 rounded-2xl bg-surface-800/40 border border-white/5 hover:border-indigo-500/30 hover:bg-surface-800 transition-all group cursor-pointer"
-                  onClick={() => handleIngest(file.name)}
-                >
-                  <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 mb-4 group-hover:scale-110 transition-transform">
-                    <FileText className="w-6 h-6" />
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+               {inboundFiles.map((file, idx) => (
+                <div key={idx} className="p-4 rounded-2xl border bg-surface-800 border-white/10 transition-all duration-300 flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-500/20 text-blue-400">
+                    <CloudUpload className="w-4 h-4" />
                   </div>
-                  <h4 className="text-sm font-bold text-white truncate mb-1">{file.name}</h4>
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-500 font-mono">{(file.size / (1024 * 1024)).toFixed(2)} MB</span>
-                    <button className="text-[10px] font-bold text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1">
-                      INGEST <ArrowRight className="w-3 h-3" />
-                    </button>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-white truncate">{file.name}</p>
+                    <p className="text-[10px] text-slate-500">Waiting for SFTP Poller...</p>
                   </div>
                 </div>
               ))}
@@ -287,53 +265,27 @@ export default function DashboardPage() {
   )
 }
 
-function UploadCard({ upload, blob, onOpen, onCancel }) {
+function UploadCard({ upload, onOpen, onCancel }) {
   const isDone = upload.status === 'done'
   const isError = upload.status === 'error'
-
-  // During the AI phase, use the real progress from the polled blob record
-  const isCompleted = blob?.status === 'COMPLETED'
-  const ingestProgress = blob?.progress ?? 0
-  const isAiPhase = isDone && !isCompleted
-
-  // Determine the status label and icon colour
-  let statusLabel = 'Uploading...'
-  let iconBg = 'bg-indigo-500/20 text-indigo-400'
-  if (isCompleted) {
-    statusLabel = 'Ready for Review'
-    iconBg = 'bg-green-500/20 text-green-400'
-  } else if (isAiPhase) {
-    const blobStatus = blob?.status
-    if (blobStatus === 'EXPLODED') statusLabel = `AI Classifying — ${ingestProgress}%`
-    else if (blobStatus === 'PROCESSING') statusLabel = 'Exploding PDF...'
-    else statusLabel = 'Queued...'
-    iconBg = 'bg-indigo-500/20 text-indigo-400'
-  } else if (!isDone && !isError) {
-    statusLabel = `Uploading — ${upload.progress}%`
-  }
 
   return (
     <div className={`
       p-4 rounded-2xl border transition-all duration-300
-      ${isCompleted ? 'bg-green-500/5 border-green-500/20' : isError ? 'bg-red-500/5 border-red-500/20' : 'bg-surface-800/80 border-white/10'}
+      ${isDone ? 'bg-green-500/5 border-green-500/20' : isError ? 'bg-red-500/5 border-red-500/20' : 'bg-surface-800 border-white/10'}
     `}>
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-3">
-          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconBg}`}>
-            {isCompleted
-              ? <Check className="w-4 h-4" />
-              : isAiPhase
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <FileText className="w-4 h-4" />
-            }
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isDone ? 'bg-green-500/20 text-green-400' : 'bg-indigo-500/20 text-indigo-400'}`}>
+            {isDone ? <Check className="w-4 h-4" /> : <FileText className="w-4 h-4" />}
           </div>
           <div className="min-w-0">
             <p className="text-xs font-semibold text-white truncate w-40">{upload.name}</p>
-            <p className="text-[10px] text-slate-400">{statusLabel}</p>
+            <p className="text-[10px] text-slate-500">{isDone ? 'Sent to SFTP Inbound' : 'Uploading...'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isCompleted && upload.blobId && (
+          {isDone && upload.blobId && (
             <button onClick={onOpen} className="p-1.5 rounded-lg bg-green-500/20 text-green-400 hover:bg-green-500/30">
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
@@ -347,31 +299,14 @@ function UploadCard({ upload, blob, onOpen, onCancel }) {
         </div>
       </div>
 
-      {/* Upload phase progress */}
       {!isDone && !isError && (
-        <div className="space-y-1.5">
+        <div className="space-y-2">
           <div className="flex items-center justify-between text-[10px] text-slate-400">
-            <span>Uploading</span>
-            <span className="font-mono">{upload.progress}%</span>
+            <span>Progress</span>
+            <span>{upload.progress}%</span>
           </div>
-          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div className="h-full bg-indigo-500 transition-all duration-300 rounded-full" style={{ width: `${upload.progress}%` }} />
-          </div>
-        </div>
-      )}
-
-      {/* AI ingestion phase progress */}
-      {isAiPhase && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-[10px] text-slate-400">
-            <span>Ingestion</span>
-            <span className="font-mono text-indigo-400">{ingestProgress}%</span>
-          </div>
-          <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-700 rounded-full"
-              style={{ width: `${ingestProgress}%` }}
-            />
+          <div className="h-1 bg-white/5 rounded-full overflow-hidden">
+            <div className="h-full bg-indigo-500 transition-all duration-300" style={{ width: `${upload.progress}%` }} />
           </div>
         </div>
       )}
@@ -387,18 +322,15 @@ function BlobRow({ blob, onOpen, onDelete }) {
     PROCESSING: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
     COMPLETED: 'bg-green-500/10 text-green-400 border-green-500/20',
     FAILED: 'bg-red-500/10 text-red-400 border-red-500/20',
-    EXPLODED: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
   }
 
   const steps = {
-    PENDING:    'Queued',
+    PENDING: 'Queued',
     PROCESSING: 'Exploding PDF',
-    EXPLODED:   'AI Classifying',
-    COMPLETED:  'Ready for Review',
-    FAILED:     'Failed'
+    AI_PROCESSING: 'AI Classifying', // Future-proof if backend adds this
+    COMPLETED: 'Ready for Review'
   }
 
-  const isActive = blob.status === 'PROCESSING' || blob.status === 'EXPLODED'
   return (
     <div
       onClick={onOpen}
@@ -423,17 +355,6 @@ function BlobRow({ blob, onOpen, onDelete }) {
             {blob.pageCount} pages
           </div>
         </div>
-        {isActive && (
-          <div className="mt-2 space-y-1">
-            <div className="h-1 bg-white/5 rounded-full overflow-hidden w-48">
-              <div
-                className="h-full bg-indigo-500 transition-all duration-700 rounded-full"
-                style={{ width: `${blob.progress || 0}%` }}
-              />
-            </div>
-            <span className="text-[10px] font-mono text-indigo-400">{blob.progress || 0}% complete</span>
-          </div>
-        )}
       </div>
 
       <div className="flex items-center gap-6">

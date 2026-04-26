@@ -10,3 +10,5 @@ requests
 python-dotenv
 scikit-learn
 opencv-python-headless
+cryptography
+paramiko

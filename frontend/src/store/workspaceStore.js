@@ -88,31 +88,46 @@ const useWorkspaceStore = create((set, get) => ({
   },
 
   splitAfterPage: async (pageId) => {
-    const { pages, blob, documents } = get()
-    const idx = pages.findIndex((p) => p.id === pageId)
-    if (idx < 0 || idx >= pages.length - 1) return
+    const { documents, blob } = get()
 
-    const firstGroup = pages.slice(0, idx + 1)
-    const secondGroup = pages.slice(idx + 1)
+    // 1. Find the document that currently contains this page
+    const sourceDoc = documents.find(doc => doc.pages.some(dp => dp.pageId === pageId))
+    if (!sourceDoc) return
 
-    const label1 = firstGroup[0]?.aiLabel || 'Document'
-    const label2 = secondGroup[0]?.aiLabel || 'Document'
+    // 2. Identify the pages in that document that come AFTER the split point
+    const docPages = sourceDoc.pages // These are already ordered by 'order' from the backend
+    const splitIndex = docPages.findIndex(dp => dp.pageId === pageId)
 
-    const [r1, r2] = await Promise.all([
-      splitDocument({ blobId: blob.id, pageIds: firstGroup.map((p) => p.id), documentType: label1, name: label1 }),
-      splitDocument({ blobId: blob.id, pageIds: secondGroup.map((p) => p.id), documentType: label2, name: label2 }),
-    ])
+    // If it's the last page of the document, there's nothing to split "after"
+    if (splitIndex < 0 || splitIndex >= docPages.length - 1) return
 
-    set({ documents: [r1.data.data, r2.data.data] })
+    const movingPages = docPages.slice(splitIndex + 1).map(dp => dp.pageId)
+
+    // 3. Move only those subsequent pages to a new document
+    const { data } = await splitDocument({
+      blobId: blob.id,
+      pageIds: movingPages,
+      documentType: sourceDoc.documentType,
+      name: sourceDoc.name
+    })
+
+    // 4. Update state with the fresh list of documents from the backend
+    set({ documents: data.allDocuments })
   },
 
   staplePages: async () => {
-    const { selectedPageIds, pages, blob, documents } = get()
+    const { selectedPageIds, pages, blob } = get()
     if (selectedPageIds.length < 2) return
     const selected = pages.filter(p => selectedPageIds.includes(p.id))
     const label = selected[0]?.aiLabel || 'Stapled Document'
     const { data } = await splitDocument({ blobId: blob.id, pageIds: selectedPageIds, documentType: label, name: label })
-    set({ documents: [...documents, data.data], selectedPageIds: [], selectedDocumentId: data.data.id })
+
+    // Use allDocuments to ensure consistency
+    set({
+      documents: data.allDocuments,
+      selectedPageIds: [],
+      selectedDocumentId: data.data.id
+    })
   },
 
   mergeDocuments: async (sourceId, targetId) => {

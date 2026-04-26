@@ -112,13 +112,14 @@ async def export_documents(req: ExportRequest):
     try:
         import fitz
         exported_files = []
-        os.makedirs(os.path.join(STORAGE_DIR, "final"), exist_ok=True)
+        export_folder = os.path.join(STORAGE_DIR, "final", req.blob_id)
+        os.makedirs(export_folder, exist_ok=True)
         
         for item in req.manifest:
             # item: {documentId, documentName, pages: [s3Path]}
             doc_name_clean = "".join([c for c in item['documentName'] if c.isalnum() or c in (' ', '-', '_')]).strip()
-            output_filename = f"{doc_name_clean}_{item['documentId'][:8]}.pdf"
-            output_path = os.path.join(STORAGE_DIR, "final", output_filename)
+            output_filename = f"{doc_name_clean}.pdf"
+            output_path = os.path.join(export_folder, output_filename)
             
             new_pdf = fitz.open() 
             for page_s3_path in item['pages']:
@@ -137,6 +138,93 @@ async def export_documents(req: ExportRequest):
             exported_files.append(output_filename)
         
         print(f"[SUCCESS] Exported {len(exported_files)} PDFs for Blob {req.blob_id}")
+
+        # --- DYNAMIC STORAGE UPLOAD LOGIC ---
+        import sqlite3
+        import paramiko
+        import boto3
+        
+        # Fetch settings directly from DB since engine is on same machine
+        db_path = os.path.join(os.path.dirname(__file__), "../backend/prisma/dev.db")
+        settings = {}
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+            cursor.execute("SELECT * FROM storage_settings WHERE id='default'")
+            row = cursor.fetchone()
+            if row:
+                col_names = [description[0] for description in cursor.description]
+                settings = dict(zip(col_names, row))
+            conn.close()
+        except Exception as e:
+            print(f"[ERROR] Failed to fetch storage settings: {e}")
+            
+        provider = settings.get('provider', 'SFTP')
+        
+        with open(os.path.join(STORAGE_DIR, "engine_sftp.log"), "a") as logf:
+            logf.write(f"\n[{req.blob_id}] Starting {provider} Upload Logic.\n")
+            
+            if provider == 'S3':
+                bucket = settings.get('s3Bucket')
+                access_key = settings.get('s3AccessKey')
+                secret_key = settings.get('s3SecretKey')
+                region = settings.get('s3Region', 'us-east-1')
+                
+                if bucket and access_key and secret_key:
+                    try:
+                        s3 = boto3.client(
+                            's3',
+                            region_name=region,
+                            aws_access_key_id=access_key,
+                            aws_secret_access_key=secret_key
+                        )
+                        for filename in exported_files:
+                            local_path = os.path.join(export_folder, filename)
+                            remote_path = f"Outbound/{filename}"
+                            logf.write(f"[{req.blob_id}] Uploading {filename} to S3 {bucket}/{remote_path}...\n")
+                            s3.upload_file(local_path, bucket, remote_path)
+                        logf.write(f"[{req.blob_id}] S3 Upload completed successfully.\n")
+                    except Exception as s3_e:
+                        logf.write(f"[{req.blob_id}] [ERROR] S3 Upload failed: {s3_e}\n")
+                else:
+                    logf.write(f"[{req.blob_id}] [SKIPPED] Missing S3 credentials.\n")
+                    
+            else: # SFTP
+                sftp_host = settings.get('sftpHost') or os.getenv("SFTP_HOST")
+                sftp_port = settings.get('sftpPort') or int(os.getenv("SFTP_PORT", "22"))
+                sftp_user = settings.get('sftpUser') or os.getenv("SFTP_USERNAME")
+                sftp_pass = settings.get('sftpPass') or os.getenv("SFTP_PASSWORD")
+                
+                if sftp_host and sftp_user and sftp_pass:
+                    try:
+                        logf.write(f"[{req.blob_id}] Connecting to {sftp_host}:{sftp_port}...\n")
+                        transport = paramiko.Transport((sftp_host, int(sftp_port)))
+                        transport.connect(username=sftp_user, password=sftp_pass)
+                        sftp = paramiko.SFTPClient.from_transport(transport)
+                        
+                        # Ensure /Outbound exists
+                        try:
+                            sftp.mkdir("/Outbound")
+                        except IOError:
+                            pass
+
+                        # Upload directly to /Outbound (no subfolder)
+                        remote_folder = "/Outbound"
+                        
+                        for filename in exported_files:
+                            local_path = os.path.join(export_folder, filename)
+                            remote_path = f"{remote_folder}/{filename}"
+                            logf.write(f"[{req.blob_id}] Uploading {filename} to {remote_path}...\n")
+                            sftp.put(local_path, remote_path)
+                        
+                        sftp.close()
+                        transport.close()
+                        logf.write(f"[{req.blob_id}] SFTP Upload completed successfully.\n")
+                    except Exception as sftp_e:
+                        logf.write(f"[{req.blob_id}] [ERROR] SFTP Upload failed: {sftp_e}\n")
+                else:
+                    logf.write(f"[{req.blob_id}] [SKIPPED] Missing SFTP credentials.\n")
+
         return {"success": True, "files": exported_files}
         
     except Exception as e:

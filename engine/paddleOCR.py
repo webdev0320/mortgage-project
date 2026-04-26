@@ -249,22 +249,23 @@ def process_pdf_with_ocr(pdf_path, output_file, ocr):
         page_num = page_result['page_num']
         text_blocks = page_result['text_blocks']
 
-        doc_type = classify_page(text_blocks)
+        # classify_page returns (label, confidence)
+        label, confidence = classify_page(text_blocks)
 
         if current_doc is None:
             current_doc = {
-                "type": doc_type,
+                "type": label,
                 "start_page": page_num,
                 "end_page": page_num
             }
         else:
-            # Handle UNKNOWN pages by continuing previous document
-            if doc_type == current_doc["type"] or doc_type == "UNKNOWN":
+            # Handle UNCLASSIFIED pages by continuing previous document
+            if label == current_doc["type"] or label == "UNCLASSIFIED":
                 current_doc["end_page"] = page_num
             else:
                 document_segments.append(current_doc)
                 current_doc = {
-                    "type": doc_type,
+                    "type": label,
                     "start_page": page_num,
                     "end_page": page_num
                 }

@@ -15,6 +15,7 @@ export const uploadBlob = (file, onProgress) => {
 }
 
 export const fetchBlobs = () => api.get('/blobs')
+export const fetchInboundFiles = () => api.get('/upload/inbound')
 export const fetchBlob = (id) => api.get(`/blobs/${id}`)
 export const deleteBlob = (id) => api.delete(`/blobs/${id}`)
 export const updatePage = (id, data) => api.patch(`/pages/${id}`, data)
@@ -33,6 +34,5 @@ export const fetchConfiguredDocTypes = () => api.get('/admin/doc-types')
 export const createConfiguredDocType = (data) => api.post('/admin/doc-types', data)
 export const deleteConfiguredDocType = (id) => api.delete(`/admin/doc-types/${id}`)
 
-// Demo Files
-export const fetchDemoFiles = () => api.get('/demo/files')
-export const ingestDemoFile = (filename) => api.post('/demo/ingest', { filename })
+export const fetchStorageSettings = () => api.get('/admin/storage-settings')
+export const updateStorageSettings = (data) => api.put('/admin/storage-settings', data)
