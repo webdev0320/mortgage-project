@@ -7,7 +7,7 @@ import {
   Hand
 } from 'lucide-react'
 
-const S3_BASE = import.meta.env.VITE_STORAGE_BASE ?? 'http://localhost:3001/storage/pages'
+const S3_BASE = import.meta.env.VITE_STORAGE_BASE ?? 'https://mortgage-project-ivory.vercel.app/storage/pages'
 
 export default function MainCanvas() {
   const { pages, selectedPageId, selectPage, rotatePage } = useWorkspaceStore()

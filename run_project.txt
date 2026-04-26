@@ -1,0 +1,106 @@
+# Project Run Instructions
+
+This document provides the commands to set up and run the Mortgage IDP Workbench on a new machine.
+
+## Prerequisites
+- Node.js (v18 or higher)
+- Python (v3.10 or higher)
+
+---
+
+## Quick Start (Using Root Shortcuts)
+If you want to run everything from the root directory, follow these steps:
+
+1. **Install all dependencies:**
+   ```bash
+   # From the root directory
+   npm install
+   cd backend && npm install && cd ..
+   cd frontend && npm install && cd ..
+   cd engine && python -m venv .venv && .\.venv\Scripts\activate && pip install -r requirements.txt && cd ..
+   ```
+
+2. **Run Services (Separate Terminals):**
+   - **Backend:** `npm run dev:backend`
+   - **Frontend:** `npm run dev:frontend`
+   - **Engine:** `npm run dev:engine`
+
+---
+
+## Detailed Setup & Run Commands
+
+### 1. Backend Orchestration (Node.js + Express + Prisma)
+The backend manages the database, file orchestration, and API endpoints.
+
+```bash
+# Navigate to backend directory
+cd backend
+
+# Install dependencies
+npm install
+
+# Run database migrations (Initialize SQLite)
+npx prisma migrate dev --name init
+
+# Seed initial data (optional but recommended for first setup)
+node prisma/seed.js
+
+# Start the backend server
+npm run dev
+```
+*The backend will run on http://localhost:3001*
+
+---
+
+### 2. AI Engine (Python FastAPI)
+The engine handles OCR, document classification, and PDF processing.
+
+```bash
+# Navigate to engine directory
+cd engine
+
+# Create a virtual environment
+python -m venv .venv
+
+# Activate the virtual environment
+# On Windows:
+.\.venv\Scripts\activate
+# On Linux/macOS:
+# source .venv/bin/activate
+
+# Install Python dependencies
+pip install -r requirements.txt
+
+# Start the AI engine
+python main.py
+```
+*The engine will run on http://localhost:8000*
+
+---
+
+### 3. Frontend (React + Vite)
+The user interface for document processing and auditing.
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+*The frontend will run on http://localhost:5173*
+
+---
+
+## Summary of Ports
+- **Frontend**: 5173
+- **Backend**: 3001
+- **Engine**: 8000
+
+## Troubleshooting
+- **Environment Variables:** Ensure all `.env` files are correctly configured in each directory.
+- **Python Dependencies:** If you encounter errors with `paddleocr` or `easyocr`, ensure you have the necessary system libraries (like C++ redistributables on Windows).
+- **Database:** If the backend fails to start, ensure the `dev.db` file is correctly initialized via the prisma migration command.

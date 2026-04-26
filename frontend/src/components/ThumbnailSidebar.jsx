@@ -11,7 +11,7 @@ import { CSS } from '@dnd-kit/utilities'
 import useWorkspaceStore from '../store/workspaceStore'
 import { Scissors, Flag, RotateCw, GripVertical, AlertTriangle } from 'lucide-react'
 
-const S3_BASE = import.meta.env.VITE_STORAGE_BASE ?? 'http://localhost:3001/storage/pages'
+const S3_BASE = import.meta.env.VITE_STORAGE_BASE ?? 'https://mortgage-project-ivory.vercel.app/storage/pages'
 
 export default function ThumbnailSidebar() {
   const {

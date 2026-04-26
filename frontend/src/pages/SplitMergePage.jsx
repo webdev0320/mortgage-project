@@ -130,7 +130,7 @@ export default function SplitMergePage() {
                     `}
                   >
                     <img 
-                      src={`http://localhost:3001/storage/pages/${page.s3Path}`}
+                      src={`https://mortgage-project-ivory.vercel.app//storage/pages/${page.s3Path}`}
                       alt={`Page ${index + 1}`}
                       className="w-full h-full object-cover pointer-events-none"
                     />
