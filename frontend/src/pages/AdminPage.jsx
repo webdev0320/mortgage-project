@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react'
 import {
   fetchUsers, createUser, updateUser, deleteUser,
-  fetchConfiguredDocTypes, createConfiguredDocType, deleteConfiguredDocType
+  fetchConfiguredDocTypes, createConfiguredDocType, deleteConfiguredDocType,
+  fetchStorageSettings, updateStorageSettings
 } from '../api/client'
 import {
   Users, FileStack, ShieldAlert, Plus, Trash2,
   CheckCircle, XCircle, ChevronRight, Settings,
-  ArrowLeft, Search, Mail
+  ArrowLeft, Search, Mail, Server, Cloud
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
@@ -73,7 +74,8 @@ export default function AdminPage() {
              <p className="text-sm text-slate-500 mt-1">
                {activeTab === 'users'
                  ? 'Control access levels and operator status.'
-                 : 'Configure classifications available for the AI and HITL workforce.'}
+                 : activeTab === 'doctypes' ? 'Configure classifications available for the AI and HITL workforce.'
+                 : 'Configure global system parameters including storage providers.'}
              </p>
            </div>
         </header>
@@ -81,12 +83,7 @@ export default function AdminPage() {
         <div className="p-8">
           {activeTab === 'users' && <UserManagement />}
           {activeTab === 'doctypes' && <DocTypeManagement />}
-          {activeTab === 'settings' && (
-            <div className="p-20 text-center grayscale opacity-50">
-               <Settings className="w-12 h-12 mx-auto mb-4" />
-               <p>Global system settings are managed via environment variables.</p>
-            </div>
-          )}
+          {activeTab === 'settings' && <SystemSettings />}
         </div>
       </main>
     </div>
@@ -353,5 +350,164 @@ function DocTypeManagement() {
           ))}
        </div>
      </div>
+  )
+}
+
+// ── System Settings Sub-Page ──
+
+function SystemSettings() {
+  const [settings, setSettings] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { load() }, [])
+
+  const load = async () => {
+    try {
+      const { data } = await fetchStorageSettings()
+      setSettings(data.data)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    try {
+      await updateStorageSettings(settings)
+      alert('Settings saved successfully. The engine will use the new provider immediately.')
+    } catch (err) {
+      alert('Failed to save settings.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (loading || !settings) return <div className="p-8 text-center text-slate-500">Loading settings...</div>
+
+  return (
+    <div className="max-w-3xl space-y-8">
+      <div className="flex items-center gap-4 border-b border-white/5 pb-6">
+         <button 
+           onClick={() => setSettings({...settings, provider: 'SFTP'})}
+           className={`flex-1 p-6 rounded-2xl border transition-all ${settings.provider === 'SFTP' ? 'bg-indigo-500/10 border-indigo-500/50' : 'bg-surface-900/30 border-white/5 hover:border-white/10'}`}
+         >
+            <Server className={`w-8 h-8 mb-3 ${settings.provider === 'SFTP' ? 'text-indigo-400' : 'text-slate-500'}`} />
+            <h3 className={`font-bold ${settings.provider === 'SFTP' ? 'text-indigo-100' : 'text-slate-400'}`}>SFTP Server</h3>
+            <p className="text-xs text-slate-500 mt-1">Store files on a remote SSH file system</p>
+         </button>
+         
+         <button 
+           onClick={() => setSettings({...settings, provider: 'S3'})}
+           className={`flex-1 p-6 rounded-2xl border transition-all ${settings.provider === 'S3' ? 'bg-orange-500/10 border-orange-500/50' : 'bg-surface-900/30 border-white/5 hover:border-white/10'}`}
+         >
+            <Cloud className={`w-8 h-8 mb-3 ${settings.provider === 'S3' ? 'text-orange-400' : 'text-slate-500'}`} />
+            <h3 className={`font-bold ${settings.provider === 'S3' ? 'text-orange-100' : 'text-slate-400'}`}>AWS S3</h3>
+            <p className="text-xs text-slate-500 mt-1">Store files in an Amazon S3 Bucket</p>
+         </button>
+      </div>
+
+      <form onSubmit={handleSave} className="space-y-6">
+        
+        {settings.provider === 'SFTP' && (
+          <div className="space-y-4 fade-up">
+            <h3 className="text-lg font-bold text-white mb-4">SFTP Credentials</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Host</label>
+                <input
+                  type="text"
+                  value={settings.sftpHost || ''}
+                  onChange={e => setSettings({...settings, sftpHost: e.target.value})}
+                  className="w-full bg-[#13161e] border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500"
+                  placeholder="sftp.example.com"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Port</label>
+                <input
+                  type="number"
+                  value={settings.sftpPort || ''}
+                  onChange={e => setSettings({...settings, sftpPort: parseInt(e.target.value)})}
+                  className="w-full bg-[#13161e] border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500"
+                  placeholder="22"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Username</label>
+                <input
+                  type="text"
+                  value={settings.sftpUser || ''}
+                  onChange={e => setSettings({...settings, sftpUser: e.target.value})}
+                  className="w-full bg-[#13161e] border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Password</label>
+                <input
+                  type="password"
+                  value={settings.sftpPass || ''}
+                  onChange={e => setSettings({...settings, sftpPass: e.target.value})}
+                  className="w-full bg-[#13161e] border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {settings.provider === 'S3' && (
+          <div className="space-y-4 fade-up">
+            <h3 className="text-lg font-bold text-white mb-4">AWS S3 Configuration</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Bucket Name</label>
+                <input
+                  type="text"
+                  value={settings.s3Bucket || ''}
+                  onChange={e => setSettings({...settings, s3Bucket: e.target.value})}
+                  className="w-full bg-[#13161e] border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500"
+                  placeholder="my-company-documents"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Region</label>
+                <input
+                  type="text"
+                  value={settings.s3Region || ''}
+                  onChange={e => setSettings({...settings, s3Region: e.target.value})}
+                  className="w-full bg-[#13161e] border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500"
+                  placeholder="us-east-1"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Access Key ID</label>
+                <input
+                  type="text"
+                  value={settings.s3AccessKey || ''}
+                  onChange={e => setSettings({...settings, s3AccessKey: e.target.value})}
+                  className="w-full bg-[#13161e] border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-500 uppercase mb-2">Secret Access Key</label>
+                <input
+                  type="password"
+                  value={settings.s3SecretKey || ''}
+                  onChange={e => setSettings({...settings, s3SecretKey: e.target.value})}
+                  className="w-full bg-[#13161e] border border-white/10 rounded-xl px-4 py-2 text-sm outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="pt-6 border-t border-white/5 flex justify-end">
+          <button type="submit" disabled={saving} className="btn-primary w-40">
+            {saving ? 'Saving...' : 'Save Configuration'}
+          </button>
+        </div>
+      </form>
+    </div>
   )
 }

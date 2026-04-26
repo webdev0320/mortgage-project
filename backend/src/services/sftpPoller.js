@@ -10,58 +10,33 @@ const { encryptFile } = require('../utils/crypto');
 
 const storageDir = path.join(__dirname, '../../../storage/blobs');
 
-const sftpConfig = {
-  host: process.env.SFTP_HOST,
-  port: parseInt(process.env.SFTP_PORT || '22'),
-  username: process.env.SFTP_USERNAME,
-  password: process.env.SFTP_PASSWORD
-};
+const { listInboundFiles, downloadFromInbound, moveToArchive } = require('../utils/storage');
 
 async function pollSftp() {
-  const sftp = new Client();
   try {
-    if (!sftpConfig.host || !sftpConfig.username) {
-      logger.warn('SFTP credentials missing, skipping polling.');
-      return;
-    }
-    
-    await sftp.connect(sftpConfig);
-    
-    // Ensure folders exist
-    const inboundExists = await sftp.exists('/Inbound');
-    if (!inboundExists) await sftp.mkdir('/Inbound', true);
-    
-    const archiveExists = await sftp.exists('/Archive');
-    if (!archiveExists) await sftp.mkdir('/Archive', true);
-
-    const files = await sftp.list('/Inbound');
-    const pdfFiles = files.filter(f => f.type === '-' && f.name.toLowerCase().endsWith('.pdf'));
+    const pdfFiles = await listInboundFiles();
 
     if (pdfFiles.length === 0) {
-      await sftp.end();
       return;
     }
 
     // Get all users to assign blobs to
     const users = await prisma.user.findMany({ where: { status: 'ACTIVE' } });
     if (users.length === 0) {
-      logger.warn('No active users found to assign SFTP files to.');
-      await sftp.end();
+      logger.warn('No active users found to assign inbound files to.');
       return;
     }
 
     for (const file of pdfFiles) {
-      const remotePath = `/Inbound/${file.name}`;
-      logger.info(`Found new SFTP file: ${file.name}`);
+      logger.info(`Found new remote file: ${file.name}`);
 
       const fileName = `${uuidv4()}-${file.name}`;
-      // Fix storage path depending on backend root, let's make it relative to process.cwd() or proper __dirname
       const actualStorageDir = path.join(__dirname, '../../../storage/blobs');
       const filePath = path.join(actualStorageDir, fileName);
       const tempPath = `${filePath}.tmp`;
 
       // Download file to temp path
-      await sftp.fastGet(remotePath, tempPath);
+      await downloadFromInbound(file.name, tempPath);
       
       // Encrypt file
       await encryptFile(tempPath, filePath);
@@ -78,7 +53,7 @@ async function pollSftp() {
           },
         });
         
-        logger.info(`Blob ${blob.id} created for user ${user.id} from SFTP.`);
+        logger.info(`Blob ${blob.id} created for user ${user.id} from remote storage.`);
 
         // Trigger engine
         try {
@@ -88,7 +63,7 @@ async function pollSftp() {
             storage_path: fileName,
           });
         } catch (err) {
-          logger.error(`Failed to trigger engine for SFTP blob ${blob.id}: ${err.message}`);
+          logger.error(`Failed to trigger engine for remote blob ${blob.id}: ${err.message}`);
           await prisma.blob.update({
             where: { id: blob.id },
             data: { status: 'FAILED' },
@@ -97,20 +72,15 @@ async function pollSftp() {
       }
 
       // Move to archive to prevent reprocessing
-      const archivePath = `/Archive/${file.name}`;
       try {
-          await sftp.rename(remotePath, archivePath);
-          logger.info(`Moved ${file.name} to /Archive.`);
+          await moveToArchive(file.name);
+          logger.info(`Moved ${file.name} to Archive.`);
       } catch (err) {
-          logger.warn(`Failed to move file to Archive: ${err.message}. Attempting to delete instead.`);
-          await sftp.delete(remotePath);
+          logger.warn(`Failed to move file to Archive: ${err.message}.`);
       }
     }
-
-    await sftp.end();
   } catch (err) {
-    logger.error(`SFTP Poller Error: ${err.message}`);
-    try { await sftp.end(); } catch (e) {}
+    logger.error(`Storage Poller Error: ${err.message}`);
   }
 }
 

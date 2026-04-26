@@ -92,4 +92,38 @@ router.delete('/doc-types/:id', adminMiddleware, async (req, res) => {
   }
 });
 
+// --- STORAGE SETTINGS ---
+
+// GET /api/admin/storage-settings
+router.get('/storage-settings', adminMiddleware, async (req, res) => {
+  try {
+    let settings = await prisma.storageSettings.findUnique({ where: { id: 'default' } });
+    if (!settings) {
+      settings = await prisma.storageSettings.create({ data: { id: 'default' } });
+    }
+    res.json({ success: true, data: settings });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// PUT /api/admin/storage-settings
+router.put('/storage-settings', adminMiddleware, async (req, res) => {
+  try {
+    const data = req.body;
+    // Don't update id
+    delete data.id;
+    delete data.updatedAt;
+
+    const settings = await prisma.storageSettings.upsert({
+      where: { id: 'default' },
+      create: { id: 'default', ...data },
+      update: { ...data }
+    });
+    res.json({ success: true, data: settings });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 module.exports = router;

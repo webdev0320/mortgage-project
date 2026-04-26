@@ -113,3 +113,22 @@ model ConfiguredDocType {
 
   @@map("configured_doc_types")
 }
+
+model StorageSettings {
+  id          String   @id @default("default")
+  provider    String   @default("SFTP") // SFTP or S3
+
+  sftpHost    String?
+  sftpPort    Int      @default(22)
+  sftpUser    String?
+  sftpPass    String?
+
+  s3Bucket    String?
+  s3Region    String?
+  s3AccessKey String?
+  s3SecretKey String?
+
+  updatedAt   DateTime @updatedAt
+
+  @@map("storage_settings")
+}

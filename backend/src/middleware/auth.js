@@ -1,6 +1,6 @@
 const jwt = require('jsonwebtoken');
 
-const authMiddleware = (req, res, next) => {
+const authMiddleware = async (req, res, next) => {
   const token = req.cookies.token || req.headers.authorization?.split(' ')[1];
 
   if (!token) {
@@ -9,6 +9,14 @@ const authMiddleware = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    
+    // Verify user actually exists in DB
+    const { prisma } = require('../lib/prisma');
+    const user = await prisma.user.findUnique({ where: { id: decoded.id } });
+    if (!user) {
+      return res.status(401).json({ success: false, message: 'User no longer exists. Please log in again.' });
+    }
+    
     req.user = decoded;
     next();
   } catch (err) {
