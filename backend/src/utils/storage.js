@@ -37,8 +37,8 @@ async function streamToBuffer(stream) {
   });
 }
 
-/** Uploads a file buffer to the remote Inbound folder */
-async function uploadToInbound(filename, buffer) {
+/** Uploads a file buffer to a remote folder */
+async function uploadToRemote(filename, buffer, folder = 'Inbound') {
   const settings = await getStorageConfig();
 
   if (settings.provider === 'S3') {
@@ -46,7 +46,7 @@ async function uploadToInbound(filename, buffer) {
     const s3 = getS3Client(settings);
     await s3.send(new PutObjectCommand({
       Bucket: settings.s3Bucket,
-      Key: `Inbound/${filename}`,
+      Key: `${folder}/${filename}`,
       Body: buffer
     }));
   } else {
@@ -60,16 +60,22 @@ async function uploadToInbound(filename, buffer) {
       password: settings.sftpPass
     });
     
-    const inboundExists = await sftp.exists('/Inbound');
-    if (!inboundExists) await sftp.mkdir('/Inbound', true);
+    const folderPath = `/${folder}`;
+    const exists = await sftp.exists(folderPath);
+    if (!exists) await sftp.mkdir(folderPath, true);
 
-    await sftp.put(buffer, `/Inbound/${filename}`);
+    await sftp.put(buffer, `${folderPath}/${filename}`);
     await sftp.end();
   }
 }
 
-/** Lists files in the remote Inbound folder */
-async function listInboundFiles() {
+/** Uploads a file buffer to the remote Inbound folder (Legacy wrapper) */
+async function uploadToInbound(filename, buffer) {
+  return uploadToRemote(filename, buffer, 'Inbound');
+}
+
+/** Lists files in a remote folder */
+async function listRemoteFiles(folder = 'Inbound', allowedExtensions = ['.pdf']) {
   const settings = await getStorageConfig();
 
   if (settings.provider === 'S3') {
@@ -77,14 +83,18 @@ async function listInboundFiles() {
     const s3 = getS3Client(settings);
     const data = await s3.send(new ListObjectsV2Command({
       Bucket: settings.s3Bucket,
-      Prefix: 'Inbound/'
+      Prefix: `${folder}/`
     }));
     
     if (!data.Contents) return [];
     
     return data.Contents
-      .filter(item => item.Key !== 'Inbound/' && item.Key.toLowerCase().endsWith('.pdf'))
-      .map(item => ({ name: item.Key.replace('Inbound/', ''), type: '-' }));
+      .filter(item => {
+        if (item.Key === `${folder}/`) return false;
+        const lowerKey = item.Key.toLowerCase();
+        return allowedExtensions.some(ext => lowerKey.endsWith(ext));
+      })
+      .map(item => ({ name: item.Key.replace(`${folder}/`, ''), type: '-' }));
   } else {
     if (!settings.sftpHost || !settings.sftpUser) throw new Error('SFTP credentials missing');
     const sftp = new Client();
@@ -95,20 +105,30 @@ async function listInboundFiles() {
       password: settings.sftpPass
     });
 
-    const inboundExists = await sftp.exists('/Inbound');
-    if (!inboundExists) {
+    const folderPath = `/${folder}`;
+    const exists = await sftp.exists(folderPath);
+    if (!exists) {
       await sftp.end();
       return [];
     }
 
-    const files = await sftp.list('/Inbound');
+    const files = await sftp.list(folderPath);
     await sftp.end();
-    return files.filter(f => f.type === '-' && f.name.toLowerCase().endsWith('.pdf'));
+    return files.filter(f => {
+      if (f.type !== '-') return false;
+      const lowerName = f.name.toLowerCase();
+      return allowedExtensions.some(ext => lowerName.endsWith(ext));
+    });
   }
 }
 
-/** Downloads a file from remote Inbound folder to a local path */
-async function downloadFromInbound(filename, localPath) {
+/** Lists files in the remote Inbound folder (Legacy wrapper) */
+async function listInboundFiles() {
+  return listRemoteFiles('Inbound', ['.pdf', '.png', '.jpg', '.jpeg']);
+}
+
+/** Downloads a file from remote folder to a local path */
+async function downloadFromRemote(filename, localPath, folder = 'Inbound') {
   const settings = await getStorageConfig();
   const fs = require('fs/promises');
 
@@ -116,7 +136,7 @@ async function downloadFromInbound(filename, localPath) {
     const s3 = getS3Client(settings);
     const data = await s3.send(new GetObjectCommand({
       Bucket: settings.s3Bucket,
-      Key: `Inbound/${filename}`
+      Key: `${folder}/${filename}`
     }));
     const buffer = await streamToBuffer(data.Body);
     await fs.writeFile(localPath, buffer);
@@ -128,9 +148,14 @@ async function downloadFromInbound(filename, localPath) {
       username: settings.sftpUser,
       password: settings.sftpPass
     });
-    await sftp.fastGet(`/Inbound/${filename}`, localPath);
+    await sftp.fastGet(`/${folder}/${filename}`, localPath);
     await sftp.end();
   }
+}
+
+/** Downloads a file from remote Inbound folder to a local path (Legacy wrapper) */
+async function downloadFromInbound(filename, localPath) {
+  return downloadFromRemote(filename, localPath, 'Inbound');
 }
 
 /** Moves a file from Inbound to Archive on the remote server */
@@ -194,8 +219,11 @@ async function deleteFromInbound(filename) {
 
 module.exports = {
   getStorageConfig,
+  uploadToRemote,
   uploadToInbound,
+  listRemoteFiles,
   listInboundFiles,
+  downloadFromRemote,
   downloadFromInbound,
   moveToArchive,
   deleteFromInbound

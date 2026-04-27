@@ -16,6 +16,7 @@ const documentsRouter = require('./routes/documents');
 const exportRouter = require('./routes/export');
 const adminRouter = require('./routes/admin');
 const demoRouter = require('./routes/demo');
+const storageProxyRouter = require('./routes/storageProxy');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -53,6 +54,14 @@ app.use('/api/documents', authMiddleware, documentsRouter);
 app.use('/api/export', authMiddleware, exportRouter);
 app.use('/api/admin', adminRouter);
 app.use('/api/demo', demoRouter);
+app.use('/api/storage', storageProxyRouter);
+
+// Manual trigger for Vercel Cron
+app.get('/api/poll', async (req, res) => {
+  const { pollSftp } = require('./services/sftpPoller');
+  await pollSftp();
+  res.json({ success: true, message: 'Poller triggered' });
+});
 
 // Global error handler
 app.use(errorHandler);

@@ -38,10 +38,13 @@ router.post('/:blobId', async (req, res) => {
     }));
 
     // 3. Call engine
+    const { getStorageConfig } = require('../utils/storage');
+    const storageSettings = await getStorageConfig();
     const response = await axios.post(`${ENGINE_URL}/export`, {
       blob_id: blobId,
       filename: blob.filename,
-      manifest: manifest
+      manifest: manifest,
+      storage_settings: storageSettings
     });
 
     // 4. Update blob status to EXPORTED or similar if needed
